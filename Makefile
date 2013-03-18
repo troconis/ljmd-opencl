@@ -1,0 +1,88 @@
+SHELL=/bin/sh
+
+CC=icc
+#CFLAGS= -I/opt/amd/AMD-APP-SDK-v2.8-RC-lnx64/include
+#CFLAGS= -I/opt/intel/opencl-1.2-3.0.56860/include
+CFLAGS= -I/opt/cuda/5.0/include/
+OPENMP=-openmp 
+NUM=4
+#OPT=-Wall -O0 $(OPENMP)
+OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
+#OPT= -O3 $(OPENMP) -Wall #-D_USE_FLOAT
+#OPT= -O3 $(OPENMP) -Wall
+#OPENCL_LIBS=-L/opt/amd/AMD-APP-SDK-v2.8-RC-lnx64/lib/x86_64 -lOpenCL
+#OPENCL_LIBS=-L/opt/intel/opencl-1.2-3.0.56860/lib64 -lOpenCL
+OPENCL_LIBS=-L/opt/cuda/5.0/lib -lOpenCL
+LIB=-lm
+
+# required input and data files.
+INPUTS= argon_108.inp argon_2916.inp argon_78732.inp \
+	argon_108.rest argon_2916.rest argon_78732.rest
+
+# baseline sources
+ALL=ljmd-c1.x ljmd-cl.x
+
+all: $(ALL) input $(BASE)
+
+.SUFFIXES:
+.SUFFIXES: .c .f90 .x
+.PHONY: all clean bench input
+
+input: $(INPUTS)
+
+$(INPUTS): 
+	ln -s ../00_input/$@ $@
+
+bench: all $(INPUTS)
+	@echo ========================================== >  ljmd.time 
+	@for s in c c0 c1 c2 c3 c4 f f0 f1 f2 f3 f4 cc fc; do \
+	  echo ========================================== >> ljmd.time ; \
+	  echo ljmd-$$s.x 108 atoms                       >> ljmd.time ; \
+	  ( env OMP_NUM_THREADS=4 time ./ljmd-$$s.x < argon_108.inp )  2>> ljmd.time ; \
+	done
+	@echo ========================================== >> ljmd.time 
+	@for s in c c0 c1 c2 c3 c4 f f0 f1 f2 f3 f4 cc fc; do \
+	  echo ========================================== >> ljmd.time ; \
+	  echo ljmd-$$s.x 2916 atoms                      >> ljmd.time ; \
+	  ( env OMP_NUM_THREADS=4 time ./ljmd-$$s.x < argon_2916.inp ) 2>> ljmd.time ; \
+	done
+	@echo ========================================== >> ljmd.time 
+
+clean:
+	-rm -f $(ALL) *.o *.mod *~ fort.* argon_108.dat  argon_108.xyz	\
+	lj_108.restart lj_108.xyz log.lj_108 argon_108.gmon			\
+	argon_108.prof argon_2916.dat argon_2916.xyz log.lammps		\
+	lj_2916.restart lj_2916.xyz log.lj_2916 $(INPUTS) $(BASE)
+
+# dependencies
+#ljmd-c.x:  ljmd-c.c
+
+ljmd-c1.x: ljmd-c1.o
+	$(CC) $(OPT) -o ljmd-c1.x ljmd-c1.o $(LIB)	
+
+ljmd-cl.x: ljmd-cl.o OpenCL_utils.o
+	$(CC) $(OPT) -o ljmd-cl.x ljmd-cl.o OpenCL_utils.o $(OPENCL_LIBS) $(LIB)		
+
+ljmd-c1.o: ljmd-c1.c
+	$(CC) $(OPT) -c ljmd-c1.c
+
+ljmd-cl.o: ljmd-cl.c
+	$(CC) $(OPT) $(CFLAGS) -c ljmd-cl.c
+
+OpenCL_utils.o: OpenCL_utils.c
+	$(CC) $(OPT) $(CFLAGS) -c OpenCL_utils.c
+
+#ljmd-c2.x: ljmd-c2.c
+#ljmd-c3.x: ljmd-c3.c
+#ljmd-c4.x: ljmd-c4.c
+
+#ljmd-f.x:  ljmd-f.f90
+#ljmd-f0.x: ljmd-f0.f90
+#ljmd-f1.x: ljmd-f1.f90
+#ljmd-f2.x: ljmd-f2.f90
+#ljmd-f3.x: ljmd-f3.f90
+#ljmd-f4.x: ljmd-f4.f90
+
+#ljmd-cc.x: ljmd-cc.c
+#ljmd-fc.x: ljmd-fc.f90
+
