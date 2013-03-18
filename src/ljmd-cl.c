@@ -243,7 +243,7 @@ int main(int argc, char **argv)
   status = clSetKernelArg( kernel_azzero, 0, sizeof( cl_mem ), &cl_sys.fx );
   status |= clSetKernelArg( kernel_azzero, 1, sizeof( cl_mem ), &cl_sys.fy );
   status |= clSetKernelArg( kernel_azzero, 2, sizeof( cl_mem ), &cl_sys.fz );
-  status |= clSetKernelArg( kernel_force, 3, sizeof( int ), &cl_sys.natoms );
+  status |= clSetKernelArg( kernel_azzero, 3, sizeof( int ), &cl_sys.natoms );
   status = clEnqueueNDRangeKernel( cmdQueue, kernel_azzero, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
   status |= clSetKernelArg( kernel_force, 0, sizeof( cl_mem ), &cl_sys.fx );
