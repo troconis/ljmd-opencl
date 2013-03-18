@@ -14,6 +14,9 @@ OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 #OPENCL_LIBS=-L/opt/intel/opencl-1.2-3.0.56860/lib64 -lOpenCL
 OPENCL_LIBS=-L/opt/cuda/5.0/lib -lOpenCL
 LIB=-lm
+OBJECTS_DIR=../obj
+INCLUDE_DIR=../include
+SOURCE_DIR=../src
 
 # required input and data files.
 INPUTS= argon_108.inp argon_2916.inp argon_78732.inp \
@@ -58,19 +61,19 @@ clean:
 #ljmd-c.x:  ljmd-c.c
 
 ljmd-c1.x: ljmd-c1.o
-	$(CC) $(OPT) -o ljmd-c1.x ljmd-c1.o $(LIB)	
+	$(CC) $(OPT) -o $(OBJECTS_DIR)/ljmd-c1.x  $(OBJECTS_DIR)/ljmd-c1.o $(LIB)
 
 ljmd-cl.x: ljmd-cl.o OpenCL_utils.o
-	$(CC) $(OPT) -o ljmd-cl.x ljmd-cl.o OpenCL_utils.o $(OPENCL_LIBS) $(LIB)		
+	$(CC) $(OPT) -o $(OBJECTS_DIR)/ljmd-cl.x l $(OBJECTS_DIR)/jmd-cl.o $(OBJECTS_DIR)/OpenCL_utils.o $(OPENCL_LIBS) $(LIB)
 
 ljmd-c1.o: ljmd-c1.c
-	$(CC) $(OPT) -c ljmd-c1.c
+	$(CC) $(OPT) -o $(OBJECTS_DIR)/jmd-c1.o -c $(SOURCES_DIR)/ljmd-c1.c
 
 ljmd-cl.o: ljmd-cl.c
-	$(CC) $(OPT) $(CFLAGS) -c ljmd-cl.c
+	$(CC) $(OPT) $(CFLAGS) -o $(OBJECTS_DIR)/jmd-cl.o -c $(SOURCES_DIR)/ljmd-cl.c
 
 OpenCL_utils.o: OpenCL_utils.c
-	$(CC) $(OPT) $(CFLAGS) -c OpenCL_utils.c
+	$(CC) $(OPT) $(CFLAGS) -o $(OBJECTS_DIR)/OpenCL_utils.o -c $(SOURCES_DIR)/OpenCL_utils.c
 
 #ljmd-c2.x: ljmd-c2.c
 #ljmd-c3.x: ljmd-c3.c
