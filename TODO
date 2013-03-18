@@ -8,4 +8,27 @@ In this file will keep a TODO list of issues on which people can contribute:
 - Code instrumentation for performance analysis
 - Other proposals to be discussed through the mailing list
 
+
+=================================================================================
+
+Current on-going production development:
+
+Rodrigo:
+1) Improve the data transfer performance (asynchronous compute / write output)
+2) Improve the code's modularity
+
+Oscar:
+1) Project source management
+
+Johannes:
+1) Wrapping of the OpenCL arguments setting
+
+Moses:
+1) Internal code profiling
+
+Ajasja:
+1) on automatically chosing the right number of hardware threads
+2) detecting platform to preferentially run on the GPU and then on the CPU
  
+Ivan: 
+...  
