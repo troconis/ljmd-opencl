@@ -15,4 +15,11 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
 
 char * source2string( char * filename );
 
+const char * CLErrString(cl_int status);
+
+void PrintPlatform(cl_platform_id platform);
+
+// prints a short online platform summary
+void PrintPlatformShort(cl_platform_id platform);
+
 #endif
