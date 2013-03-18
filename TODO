@@ -1,0 +1,11 @@
+In this file will keep a TODO list of issues on which people can contribute:
+
+- Code Documentation
+- Makefile and compilation setting
+- Code modularization (C/OpenCL/Utils/Input-Output)
+- Code OpenCL engine to manage the technological mapping CPU/GPU
+- Re-implement the hard coded thread launch
+- Code instrumentation for performance analysis
+- Other proposals to be discussed through the mailing list
+
+ 
