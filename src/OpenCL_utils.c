@@ -99,14 +99,15 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
     fprintf( stderr, "Unable to enumerate the platforms: %s\n", CLErrString(status));
     exit( 1 );
   }
-  
+ 
+  /* hard-coded by neumannrf to fit my laptop's gpu */
   if( !strcmp( device_type, "gpu" ) ) {
-    fprintf( stderr, "\n GPU RANGE" );
-    platform = &tmp_platforms[1];
+    fprintf( stderr, "\n GPU RANGE\n" );
+    platform = &tmp_platforms[0];
     device_kind = CL_DEVICE_TYPE_GPU;
   }
   else { 
-    platform = &tmp_platforms[0];
+    platform = &tmp_platforms[1];
     device_kind = CL_DEVICE_TYPE_CPU;
   }
 

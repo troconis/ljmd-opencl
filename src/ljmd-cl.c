@@ -126,8 +126,9 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  /* hard-coded by neumannrf to fit my laptop's gpu */
   if( !strcmp( argv[1], "cpu" ) ) nthreads = 16; 
-  else nthreads = 1024;
+  else nthreads = 2916;
 
   /* read input file */
   if(get_me_a_line(stdin,line)) return 1;
