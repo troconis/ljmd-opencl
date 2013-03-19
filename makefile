@@ -48,6 +48,8 @@ $(EXE): $(OBJECTS)
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INC)
 	$(CC) $(CFLAGS) $< -o $@ -c
 
+run: $(EXE)
+	cp $(EXE) $(TEST_DIR)/ ; cd $(TEST_DIR) ; make run
 
 test:
 	cd $(TEST_DIR); make
