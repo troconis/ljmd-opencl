@@ -346,6 +346,14 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
+    /* 6) download position@device to position@host */
+    status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
+    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
+    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+    sys.rx = buffers[0];
+    sys.ry = buffers[1];
+    sys.rz = buffers[2];
+
     /* 3) force */
     status |= clSetMultKernelArgs( kernel_force, 0, 13,
       KArg(cl_sys.fx),
@@ -395,14 +403,6 @@ int main(int argc, char **argv)
       exit( 1 );
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
-
-    /* 6) download position@device to position@host */
-    status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
-    sys.rx = buffers[0];
-    sys.ry = buffers[1];
-    sys.rz = buffers[2];
 
     /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
     status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
