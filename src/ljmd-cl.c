@@ -320,10 +320,6 @@ int main(int argc, char **argv)
   /* main MD loop */
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
 
-    /* 1) write output every nprint steps */
-    if ((sys.nfi % nprint) == 0) 
-      output(&sys, erg, traj);
-
     /* propagate system and recompute energies */
     /* 2) verlet_first   */
     status |= clSetMultKernelArgs( kernel_verlet_first, 0, 12,
@@ -416,6 +412,9 @@ int main(int argc, char **argv)
     sys.ekin *= HALF * mvsq2e * sys.mass;
     sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
     
+    /* 1) write output every nprint steps */
+    if ((sys.nfi % nprint) == 0) output(&sys, erg, traj);
+
   }
   /**************************************************/
 
