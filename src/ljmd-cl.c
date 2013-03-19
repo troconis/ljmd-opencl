@@ -374,8 +374,6 @@ int main(int argc, char **argv)
     if ((sys.nfi % nprint) == nprint-1) {
 	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
 	CheckSuccess(status, 7);
-	sys.epot = ZERO;
-	for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
     }
 
     /* 4) verlet_second */
@@ -405,14 +403,29 @@ int main(int argc, char **argv)
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
 	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
 	CheckSuccess(status, 8);
-	sys.ekin = ZERO;
-	for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
-	sys.ekin *= HALF * mvsq2e * sys.mass;
-	sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
     }
 
     /* 1) write output every nprint steps */
-    if ((sys.nfi % nprint) == 0) output(&sys, erg, traj);
+    if ((sys.nfi % nprint) == 0) {
+	
+	/* initialize the sys.epot@host and sys.ekin@host variables to ZERO */
+	sys.epot = ZERO;
+	sys.ekin = ZERO;
+	
+	/* reduction on the tmp_Exxx[i] buffers downloaded from the device 
+	 * during parts 7 and 8 of the previous MD loop iteration */
+	for( i = 0; i < nthreads; i++) {
+		sys.epot += tmp_epot[i];
+		sys.ekin += tmp_ekin[i];
+	}
+
+	/* multiplying the kinetic energy by prefactors */
+	sys.ekin *= HALF * mvsq2e * sys.mass;
+	sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
+
+	/* writing output files (positions, energies and temperature) */
+	output(&sys, erg, traj);
+    }
 
   }
   /**************************************************/
