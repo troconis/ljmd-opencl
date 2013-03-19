@@ -31,7 +31,7 @@ ORI_SRC_DIC=$(TEST_DIR)/src
 
 EXE=ljmd_CL
 CODE_FILES	= ljmd-cl.c OpenCL_utils.c
-HEADER_FILES	= OpenCL_utils.h OpenCL_data.h
+HEADER_FILES	= OpenCL_utils.h OpenCL_data.h opencl_kernels_as_string.h
 
 OBJECTS	=$(patsubst %,$(OBJ_DIR)/%,$(CODE_FILES:.c=.o))
 INCLUDES=$(patsubst %,$(INC_DIR)/%,$(HEADER_FILES))
@@ -45,9 +45,11 @@ OPENCL_LIBS=-L/opt/cuda/5.0/lib -lOpenCL
 $(EXE): $(OBJECTS)
 	$(CC) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
-$(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INC)
+$(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
 	$(CC) $(CFLAGS) $< -o $@ -c
 
+$(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
+	awk '{print "\""$$0"\\n\""}' <$< >$@
 
 test:
 	cd $(TEST_DIR); make
