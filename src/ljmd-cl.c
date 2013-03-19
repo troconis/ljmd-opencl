@@ -320,12 +320,12 @@ int main(int argc, char **argv)
   /* main MD loop */
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
 
-    /* write output, if requested */
+    /* 1) write output every nprint steps */
     if ((sys.nfi % nprint) == 0) 
       output(&sys, erg, traj);
 
     /* propagate system and recompute energies */
-    /*    verlet_first   */
+    /* 2) verlet_first   */
     status |= clSetMultKernelArgs( kernel_verlet_first, 0, 12,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -346,7 +346,7 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* force */
+    /* 3) force */
     status |= clSetMultKernelArgs( kernel_force, 0, 13,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -368,7 +368,7 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* verlet_second */
+    /* 4) verlet_second */
     status |= clSetMultKernelArgs( kernel_verlet_second, 0, 9,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_second, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* ekin */
+    /* 5) ekin */
     status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
       KArg(cl_sys.natoms), KArg(ekin_buffer));
 
@@ -396,21 +396,22 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    sys.epot = ZERO;
-    sys.ekin = ZERO;
-    /* download data on host */
+    /* 6) download position@device to position@host */
     status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
     status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
     status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
-
     sys.rx = buffers[0];
     sys.ry = buffers[1];
     sys.rz = buffers[2];
 
+    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
     status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
+    sys.epot = ZERO;
     for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
 
+    /* 8) download E_kin[i]@device and perform reduction to E_kin@host */
     status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+    sys.ekin = ZERO;
     for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
     sys.ekin *= HALF * mvsq2e * sys.mass;
     sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;

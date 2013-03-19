@@ -226,11 +226,11 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   
   if( !strcmp( device_type, "gpu" ) ) {
     fprintf( stderr, "\n GPU RANGE" );
-    platform = &tmp_platforms[1];
+    platform = &tmp_platforms[0];
     device_kind = CL_DEVICE_TYPE_GPU;
   }
   else { 
-    platform = &tmp_platforms[0];
+    platform = &tmp_platforms[1];
     device_kind = CL_DEVICE_TYPE_CPU;
   }
 

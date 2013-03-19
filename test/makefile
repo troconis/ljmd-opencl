@@ -31,6 +31,9 @@ EXE=ljmd_CL
 run: $(EXE) $(INPUTS)
 	./$(EXE) cpu < argon_108.inp
 
+optirun: $(EXE) $(INPUTS)
+	time optirun ./$(EXE) gpu < argon_2916.inp
+
 clean:
 	rm -f $(TEST_DIR)/$(ORI_EXE)
 	rm -f $(INPUTS) *.dat *.xyz
