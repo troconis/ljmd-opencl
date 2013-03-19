@@ -186,12 +186,12 @@ int main(int argc, char **argv)
     }
     
     status = clEnqueueWriteBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-    status != clEnqueueWriteBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-    status != clEnqueueWriteBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
+    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
     
-    status != clEnqueueWriteBuffer( cmdQueue, cl_sys.vx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0] + cl_sys.natoms, 0, NULL, NULL ); 
-    status != clEnqueueWriteBuffer( cmdQueue, cl_sys.vy, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1] + cl_sys.natoms, 0, NULL, NULL ); 
-    status != clEnqueueWriteBuffer( cmdQueue, cl_sys.vz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2] + cl_sys.natoms, 0, NULL, NULL ); 
+    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0] + cl_sys.natoms, 0, NULL, NULL ); 
+    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vy, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1] + cl_sys.natoms, 0, NULL, NULL ); 
+    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2] + cl_sys.natoms, 0, NULL, NULL ); 
     
     fclose(fp);
 
@@ -240,29 +240,28 @@ int main(int argc, char **argv)
   sys.ekin = ZERO;
 
   /* Azzero force buffer */
-  status = clSetKernelArg( kernel_azzero, 0, sizeof( cl_mem ), &cl_sys.fx );
-  status |= clSetKernelArg( kernel_azzero, 1, sizeof( cl_mem ), &cl_sys.fy );
-  status |= clSetKernelArg( kernel_azzero, 2, sizeof( cl_mem ), &cl_sys.fz );
-  status |= clSetKernelArg( kernel_azzero, 3, sizeof( int ), &cl_sys.natoms );
+  status = clSetMultKernelArgs( kernel_azzero, 0, 4, KArg(cl_sys.fx), KArg(cl_sys.fy), KArg(cl_sys.fz), KArg(cl_sys.natoms));
+
   status = clEnqueueNDRangeKernel( cmdQueue, kernel_azzero, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-  status |= clSetKernelArg( kernel_force, 0, sizeof( cl_mem ), &cl_sys.fx );
-  status |= clSetKernelArg( kernel_force, 1, sizeof( cl_mem ), &cl_sys.fy );
-  status |= clSetKernelArg( kernel_force, 2, sizeof( cl_mem ), &cl_sys.fz );
-  status |= clSetKernelArg( kernel_force, 3, sizeof( cl_mem ), &cl_sys.rx );
-  status |= clSetKernelArg( kernel_force, 4, sizeof( cl_mem ), &cl_sys.ry );
-  status |= clSetKernelArg( kernel_force, 5, sizeof( cl_mem ), &cl_sys.rz );
-  status |= clSetKernelArg( kernel_force, 6, sizeof( int ), &cl_sys.natoms );
-  status |= clSetKernelArg( kernel_force, 7, sizeof( cl_mem ), &epot_buffer );
-  status |= clSetKernelArg( kernel_force, 8, sizeof( FPTYPE ), &c12 );
-  status |= clSetKernelArg( kernel_force, 9, sizeof( FPTYPE ), &c6 );
-  status |= clSetKernelArg( kernel_force, 10, sizeof( FPTYPE ), &rcsq );
-  status |= clSetKernelArg( kernel_force, 11, sizeof( FPTYPE ), &boxby2 );
-  status |= clSetKernelArg( kernel_force, 12, sizeof( FPTYPE ), &sys.box );
+  status |= clSetMultKernelArgs( kernel_force, 0, 13,
+	KArg(cl_sys.fx),
+	KArg(cl_sys.fy),
+	KArg(cl_sys.fz),
+	KArg(cl_sys.rx),
+	KArg(cl_sys.ry),
+	KArg(cl_sys.rz),
+	KArg(cl_sys.natoms),
+	KArg(epot_buffer),
+	KArg(c12),
+	KArg(c6),
+	KArg(rcsq),
+	KArg(boxby2),
+	KArg(sys.box));
   
   status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
   
-  status != clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
+  status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
   
   for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
   
@@ -271,15 +270,12 @@ int main(int argc, char **argv)
   tmp_ekin = (FPTYPE *) malloc( nthreads * sizeof(FPTYPE) );
   ekin_buffer = clCreateBuffer( context, CL_MEM_READ_WRITE, nthreads * sizeof(FPTYPE), NULL, &status );
   
-  status |= clSetKernelArg( kernel_ekin, 0, sizeof( cl_mem ), &cl_sys.vx );
-  status |= clSetKernelArg( kernel_ekin, 1, sizeof( cl_mem ), &cl_sys.vy );
-  status |= clSetKernelArg( kernel_ekin, 2, sizeof( cl_mem ), &cl_sys.vz );
-  status |= clSetKernelArg( kernel_ekin, 3, sizeof( int ), &cl_sys.natoms );
-  status |= clSetKernelArg( kernel_ekin, 4, sizeof( cl_mem ), &ekin_buffer );
+  status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
+    KArg(cl_sys.natoms), KArg(ekin_buffer));
   
   status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
     
-  status != clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
+  status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
 
   for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
   sys.ekin *= HALF * mvsq2e * sys.mass;
@@ -293,8 +289,8 @@ int main(int argc, char **argv)
   
   /* download data on host */
   status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-  status != clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-  status != clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+  status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
+  status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
   
   sys.rx = buffers[0];
   sys.ry = buffers[1];
@@ -312,18 +308,19 @@ int main(int argc, char **argv)
 
     /* propagate system and recompute energies */
     /*    verlet_first   */
-    status |= clSetKernelArg( kernel_verlet_first, 0, sizeof( cl_mem ), &cl_sys.fx );
-    status |= clSetKernelArg( kernel_verlet_first, 1, sizeof( cl_mem ), &cl_sys.fy );
-    status |= clSetKernelArg( kernel_verlet_first, 2, sizeof( cl_mem ), &cl_sys.fz );
-    status |= clSetKernelArg( kernel_verlet_first, 3, sizeof( cl_mem ), &cl_sys.rx );
-    status |= clSetKernelArg( kernel_verlet_first, 4, sizeof( cl_mem ), &cl_sys.ry );
-    status |= clSetKernelArg( kernel_verlet_first, 5, sizeof( cl_mem ), &cl_sys.rz );
-    status |= clSetKernelArg( kernel_verlet_first, 6, sizeof( cl_mem ), &cl_sys.vx );
-    status |= clSetKernelArg( kernel_verlet_first, 7, sizeof( cl_mem ), &cl_sys.vy );
-    status |= clSetKernelArg( kernel_verlet_first, 8, sizeof( cl_mem ), &cl_sys.vz );
-    status |= clSetKernelArg( kernel_verlet_first, 9, sizeof( int ), &cl_sys.natoms );
-    status |= clSetKernelArg( kernel_verlet_first, 10, sizeof( FPTYPE ), &sys.dt );
-    status |= clSetKernelArg( kernel_verlet_first, 11, sizeof( FPTYPE ), &dtmf );
+    status |= clSetMultKernelArgs( kernel_verlet_first, 0, 12,
+      KArg(cl_sys.fx),
+      KArg(cl_sys.fy),
+      KArg(cl_sys.fz),
+      KArg(cl_sys.rx),
+      KArg(cl_sys.ry),
+      KArg(cl_sys.rz),
+      KArg(cl_sys.vx),
+      KArg(cl_sys.vy),
+      KArg(cl_sys.vz),
+      KArg(cl_sys.natoms),
+      KArg(sys.dt),
+      KArg(dtmf));
 
     if( status != CL_SUCCESS ){
       fprintf( stderr, "\n1 - ERROR!!!!\n\n" );
@@ -332,19 +329,20 @@ int main(int argc, char **argv)
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* force */
-    status |= clSetKernelArg( kernel_force, 0, sizeof( cl_mem ), &cl_sys.fx );
-    status |= clSetKernelArg( kernel_force, 1, sizeof( cl_mem ), &cl_sys.fy );
-    status |= clSetKernelArg( kernel_force, 2, sizeof( cl_mem ), &cl_sys.fz );
-    status |= clSetKernelArg( kernel_force, 3, sizeof( cl_mem ), &cl_sys.rx );
-    status |= clSetKernelArg( kernel_force, 4, sizeof( cl_mem ), &cl_sys.ry );
-    status |= clSetKernelArg( kernel_force, 5, sizeof( cl_mem ), &cl_sys.rz );
-    status |= clSetKernelArg( kernel_force, 6, sizeof( int ), &cl_sys.natoms );
-    status |= clSetKernelArg( kernel_force, 7, sizeof( cl_mem ), &epot_buffer );
-    status |= clSetKernelArg( kernel_force, 8, sizeof( FPTYPE ), &c12 );
-    status |= clSetKernelArg( kernel_force, 9, sizeof( FPTYPE ), &c6 );
-    status |= clSetKernelArg( kernel_force, 10, sizeof( FPTYPE ), &rcsq );
-    status |= clSetKernelArg( kernel_force, 11, sizeof( FPTYPE ), &boxby2 );
-    status |= clSetKernelArg( kernel_force, 12, sizeof( FPTYPE ), &sys.box );
+    status |= clSetMultKernelArgs( kernel_force, 0, 13,
+      KArg(cl_sys.fx),
+      KArg(cl_sys.fy),
+      KArg(cl_sys.fz),
+      KArg(cl_sys.rx),
+      KArg(cl_sys.ry),
+      KArg(cl_sys.rz),
+      KArg(cl_sys.natoms),
+      KArg(epot_buffer),
+      KArg(c12),
+      KArg(c6),
+      KArg(rcsq),
+      KArg(boxby2),
+      KArg(sys.box));
 
     if( status != CL_SUCCESS ){
       fprintf( stderr, "\n2 - ERROR!!!!\n\n" );
@@ -353,15 +351,16 @@ int main(int argc, char **argv)
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* verlet_second */
-    status |= clSetKernelArg( kernel_verlet_second, 0, sizeof( cl_mem ), &cl_sys.fx );
-    status |= clSetKernelArg( kernel_verlet_second, 1, sizeof( cl_mem ), &cl_sys.fy );
-    status |= clSetKernelArg( kernel_verlet_second, 2, sizeof( cl_mem ), &cl_sys.fz );
-    status |= clSetKernelArg( kernel_verlet_second, 3, sizeof( cl_mem ), &cl_sys.vx );
-    status |= clSetKernelArg( kernel_verlet_second, 4, sizeof( cl_mem ), &cl_sys.vy );
-    status |= clSetKernelArg( kernel_verlet_second, 5, sizeof( cl_mem ), &cl_sys.vz );
-    status |= clSetKernelArg( kernel_verlet_second, 6, sizeof( int ), &cl_sys.natoms );
-    status |= clSetKernelArg( kernel_verlet_second, 7, sizeof( FPTYPE ), &sys.dt );
-    status |= clSetKernelArg( kernel_verlet_second, 8, sizeof( FPTYPE ), &dtmf );
+    status |= clSetMultKernelArgs( kernel_verlet_second, 0, 9,
+      KArg(cl_sys.fx),
+      KArg(cl_sys.fy),
+      KArg(cl_sys.fz),
+      KArg(cl_sys.vx),
+      KArg(cl_sys.vy),
+      KArg(cl_sys.vz),
+      KArg(cl_sys.natoms),
+      KArg(sys.dt),
+      KArg(dtmf));
 
     if( status != CL_SUCCESS ) {
       fprintf( stderr, "\n3 - ERROR!!!!\n\n" );
@@ -370,11 +369,8 @@ int main(int argc, char **argv)
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_second, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* ekin */
-    status |= clSetKernelArg( kernel_ekin, 0, sizeof( cl_mem ), &cl_sys.vx );
-    status |= clSetKernelArg( kernel_ekin, 1, sizeof( cl_mem ), &cl_sys.vy );
-    status |= clSetKernelArg( kernel_ekin, 2, sizeof( cl_mem ), &cl_sys.vz );
-    status |= clSetKernelArg( kernel_ekin, 3, sizeof( int ), &cl_sys.natoms );
-    status |= clSetKernelArg( kernel_ekin, 4, sizeof( cl_mem ), &ekin_buffer );
+    status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
+      KArg(cl_sys.natoms), KArg(ekin_buffer));
 
     if( status != CL_SUCCESS ){
       fprintf( stderr, "\n4 - ERROR!!!!\n\n" );
@@ -386,17 +382,17 @@ int main(int argc, char **argv)
     sys.ekin = ZERO;
     /* download data on host */
     status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-    status != clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-    status != clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
+    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
 
     sys.rx = buffers[0];
     sys.ry = buffers[1];
     sys.rz = buffers[2];
 
-    status != clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
+    status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
     for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
 
-    status != clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
+    status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
     for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
     sys.ekin *= HALF * mvsq2e * sys.mass;
     sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
