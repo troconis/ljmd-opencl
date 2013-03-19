@@ -52,7 +52,7 @@ $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INC)
 test:
 	cd $(TEST_DIR); make
 clean:
-	rm $(EXE)
+	rm -f $(EXE) $(OBJECTS)
 	cd $(TEST_DIR); make clean
 
 

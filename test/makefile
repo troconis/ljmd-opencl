@@ -28,8 +28,8 @@ $(EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
 
 clean:
-	rm $(TEST_DIR)/ljmd-ori
-	rm  $(INPUTS) *.dat *.xyz
+	rm -f $(TEST_DIR)/ljmd-ori
+	rm -f $(INPUTS) *.dat *.xyz
 
 
 $(INPUTS):
