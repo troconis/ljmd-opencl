@@ -42,10 +42,10 @@ $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 	awk '{print "\""$$0"\\n\""}' <$< >$@
 
 
-##
-test:
+## Calls
+test: $(EXE)
 	cp $(EXE) $(TEST_DIR)/
-	cd $(TEST_DIR); make
+	cd $(TEST_DIR); make test
 clean:
 	rm -f $(EXE) $(OBJECTS)
 	cd $(TEST_DIR); make clean
