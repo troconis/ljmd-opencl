@@ -14,22 +14,27 @@ INPUT_SRC=../examples
 TEST_DIR=.
 ORI_SRC_DIC=$(TEST_DIR)/src
 
-EXE=ljmd-ori
+ORI_EXE=ljmd-ori
 #inputs and Benchmarks
 # required input and data files.
 INPUTS= argon_108.inp argon_2916.inp argon_78732.inp \
 	argon_108.rest argon_2916.rest argon_78732.rest
 
 
-test: $(EXE) $(INPUTS)
-	./$(EXE) < argon_108.inp
+test: $(ORI_EXE) $(INPUTS)
+	./$(ORI_EXE) < argon_108.inp
 
-$(EXE): $(ORI_SRC_DIC)/ljmd-c1.c
+$(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
 
+EXE=ljmd_CL
+run: $(EXE) $(INPUTS)
+	./$(EXE) cpu < argon_108.inp
+
 clean:
-	rm -f $(TEST_DIR)/ljmd-ori
+	rm -f $(TEST_DIR)/$(ORI_EXE)
 	rm -f $(INPUTS) *.dat *.xyz
+	rm -f $(EXE)
 
 
 $(INPUTS):
