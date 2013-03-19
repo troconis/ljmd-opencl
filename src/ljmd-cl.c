@@ -319,6 +319,15 @@ int main(int argc, char **argv)
   /**************************************************/
   /* main MD loop */
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
+    
+    /* This is a placeholder for the barrier that will be needed
+     * once the ReadBuffer & WriteBuffer calls are transformed to
+     * non blocking ones */
+    
+    /*
+     * if ((sys.nfi % nprint) == 0) BARRIER(event[8]); 
+     */
+
 
     /* propagate system and recompute energies */
     /* 2) verlet_first   */
