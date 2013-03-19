@@ -319,13 +319,13 @@ int main(int argc, char **argv)
   /**************************************************/
   /* main MD loop */
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
-    
+
     /* This is a placeholder for the barrier that will be needed
      * once the ReadBuffer & WriteBuffer calls are transformed to
      * non blocking ones */
-    
+
     /*
-     * if ((sys.nfi % nprint) == 0) BARRIER(event[8]); 
+     * if ((sys.nfi % nprint) == 0) BARRIER(event[8]);
      */
 
 
@@ -344,16 +344,16 @@ int main(int argc, char **argv)
       KArg(cl_sys.natoms),
       KArg(sys.dt),
       KArg(dtmf));
-    
+
     CheckSuccess(status, 2);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* 6) download position@device to position@host */
     if ((sys.nfi % nprint) == nprint-1) {
 	status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
-	
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
+
 	CheckSuccess(status, 6);
 	sys.rx = buffers[0];
 	sys.ry = buffers[1];
@@ -403,7 +403,7 @@ int main(int argc, char **argv)
     if ((sys.nfi % nprint) == nprint-1) {
 
 	/* 5) ekin */
-    	status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
+	status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
 			KArg(cl_sys.natoms), KArg(ekin_buffer));
 	CheckSuccess(status, 5);
 	status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
@@ -416,12 +416,12 @@ int main(int argc, char **argv)
 
     /* 1) write output every nprint steps */
     if ((sys.nfi % nprint) == 0) {
-	
+
 	/* initialize the sys.epot@host and sys.ekin@host variables to ZERO */
 	sys.epot = ZERO;
 	sys.ekin = ZERO;
-	
-	/* reduction on the tmp_Exxx[i] buffers downloaded from the device 
+
+	/* reduction on the tmp_Exxx[i] buffers downloaded from the device
 	 * during parts 7 and 8 of the previous MD loop iteration */
 	for( i = 0; i < nthreads; i++) {
 		sys.epot += tmp_epot[i];
