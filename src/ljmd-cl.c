@@ -89,6 +89,13 @@ static int get_me_a_line(FILE *fp, char *buf)
     return 0;
 }
  
+void PrintUsageAndExit() {
+    fprintf( stderr, "\nError. Run the program as follow: ");
+    fprintf( stderr, "\n./ljmd-cl.x device [thread-number] < input ");
+    fprintf( stderr, "\ndevice = cpu | gpu \n\n" );
+    exit(1);
+}
+
 /* append data to output. */
 static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 {
@@ -107,6 +114,7 @@ int main(int argc, char **argv)
 {
   /*OpenCL variables */
   cl_device_id device;
+  cl_device_type device_type; /*to test if we are on cpu or gpu*/
   cl_context context;
   cl_command_queue cmdQueue;
 
@@ -119,15 +127,27 @@ int main(int argc, char **argv)
   FILE *fp,*traj,*erg;
   mdsys_t sys;
   
-  if( argv[1] == NULL ){
-    fprintf( stderr, "\nError. Run the program as follow: ");
-    fprintf( stderr, "\n./ljmd-cl.x [device] < input ");
-    fprintf( stderr, "\ndevice = cpu | gpu \n\n" );
-    exit(1);
-  }
+  if( argc < 2 )
+	  PrintUsageAndExit();
 
-  if( !strcmp( argv[1], "cpu" ) ) nthreads = 16; 
-  else nthreads = 1024;
+  if( argc == 3 ) { /* if three arguments are passed (so the third is the number of threads)*/
+	  nthreads = strtol(argv[2],NULL,10);
+	  if( nthreads<0 ) {
+		  fprintf( stderr, "\n. The number of threads must be more than 1.\n");
+		  PrintUsageAndExit();
+
+	  }
+  } else {	/* do the device default*/
+	    if( !strcmp( argv[1], "cpu" ) )
+		    nthreads = 16;
+	    else
+		    nthreads = 1024;
+  }
+  /* Initialize the OpenCL environment */
+  if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
+    fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly.\n" );
+    return 4;
+  }
 
   /* read input file */
   if(get_me_a_line(stdin,line)) return 1;
@@ -152,11 +172,7 @@ int main(int argc, char **argv)
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
   
-  /* Initialize the OpenCL environment */
-  if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
-    fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly." );
-    return 4;
-  }    
+
   
   /* allocate memory */
   cl_sys.natoms = sys.natoms;
@@ -206,7 +222,9 @@ int main(int argc, char **argv)
   size_t globalWorkSize[1];
   globalWorkSize[0] = nthreads;
   
-  char * sourcecode = source2string( "src/opencl_kernels.cl" );
+  const char * sourcecode =
+  #include <opencl_kernels_as_string.h>
+  ;
 
   cl_program program = clCreateProgramWithSource( context, 1, (const char **) &sourcecode, NULL, &status );
   
