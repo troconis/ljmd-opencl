@@ -25,6 +25,7 @@ INC_DIR=include
 
 TEST_DIR=test
 ORI_SRC_DIC=$(TEST_DIR)/src
+.PHONY : clean test
 
 
 
@@ -48,13 +49,11 @@ $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INC)
 	$(CC) $(CFLAGS) $< -o $@ -c
 
 
-test: ljmd-ori
-
-ljmd-ori: $(ORI_SRC_DIC)/ljmd-c1.c
-	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
-
+test:
+	cd $(TEST_DIR); make
 clean:
-	rm -v $(TEST_DIR)/ljmd-ori
+	rm -f $(EXE) $(OBJECTS)
+	cd $(TEST_DIR); make clean
 
 
 #inputs and Benchmarks
