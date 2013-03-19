@@ -376,6 +376,11 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
+    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
+    status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
+    sys.epot = ZERO;
+    for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
+
     /* 4) verlet_second */
     status |= clSetMultKernelArgs( kernel_verlet_second, 0, 9,
       KArg(cl_sys.fx),
@@ -403,11 +408,6 @@ int main(int argc, char **argv)
       exit( 1 );
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
-
-    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
-    status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
-    sys.epot = ZERO;
-    for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
 
     /* 8) download E_kin[i]@device and perform reduction to E_kin@host */
     status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
