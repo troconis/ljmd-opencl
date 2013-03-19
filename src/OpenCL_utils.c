@@ -1,16 +1,10 @@
 #include "OpenCL_utils.h"
 #include <string.h>
+#include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
 #include <ctype.h>
 #include <sys/types.h>
-
-
-
-
-
-
-
 
 #define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
@@ -319,3 +313,33 @@ char * source2string( char * filename ){
 
 
 }
+
+
+/* commodity function for a row of clSetKernelArg calls
+   arguments: kernel,
+              first_index: index to start from,
+              nargs: number of clSetKernelArg calls (with linearly increasing index,
+              then follow narg arguments to be set in the form of KArg(variablename)
+*/
+cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs, ... ) {
+    va_list ap;
+    cl_uint ind,e_ind;
+    cl_int status;
+    size_t s;
+    void *p;
+    
+    va_start(ap, nargs);
+    status = CL_SUCCESS;
+    e_ind = first_index+nargs;
+    for(ind=first_index; ind<e_ind; ind++)
+    {
+        s = va_arg(ap, size_t);
+        p = va_arg(ap, void *);
+        status |= clSetKernelArg(kernel, ind, s, p);
+    }
+    va_end(ap);
+    
+    return status;
+}
+
+
