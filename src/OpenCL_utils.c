@@ -12,6 +12,8 @@
 
 
 
+#define Warning(...)    fprintf(stderr, __VA_ARGS__)
+
 /*
  * CLErrString --
  *
@@ -38,16 +40,8 @@ double second()
 }
 
 
-double t1, t2;
 
-
-
-
-
-
-
-static const char *
-CLErrString(cl_int status) {
+const char * CLErrString(cl_int status) {
    static struct { cl_int code; const char *msg; } error_table[] = {
       { CL_SUCCESS, "success" },
       { CL_DEVICE_NOT_FOUND, "device not found", },
@@ -79,6 +73,7 @@ CLErrString(cl_int status) {
    return unknown;
 }
 
+void PrintDeviceShort(cl_device_id device);
 
 void PrintPlatform(cl_platform_id platform) {
 
@@ -110,6 +105,104 @@ void PrintPlatform(cl_platform_id platform) {
    }
   
 }
+
+// prints a short one line platform summary
+void PrintPlatformShort(cl_platform_id platform) {
+
+   static struct { cl_platform_info param; const char *name;  char value[255];} props[] = {
+      { CL_PLATFORM_PROFILE, "profile","" },
+      { CL_PLATFORM_VERSION, "version","" },
+      { CL_PLATFORM_NAME, "name","" },
+      { CL_PLATFORM_VENDOR, "vendor","" },
+      { 0, NULL },
+   };
+
+   cl_int status;
+   size_t size;
+   int ii;
+   cl_device_id *deviceList;
+   cl_uint numDevices;
+
+   for (ii = 0; props[ii].name != NULL; ii++) {
+      status = clGetPlatformInfo(platform, props[ii].param, sizeof(props[ii].value), props[ii].value, &size);
+      //fprintf(stdout, "size of buf: %d \n", sizeof(props[ii].value));
+      if ( status != CL_SUCCESS ) {
+		fprintf( stderr, "platform[%p]: Unable to get %s: %s\n", platform, props[ii].name, CLErrString( status ) );
+			 continue;
+      }
+      if ( size > sizeof  props[ii].value) {
+		fprintf( stderr, "platform[%p]: Huge %s (%ld bytes)!  Truncating to %ld\n",
+				platform, props[ii].name, size, sizeof  props[ii].value );
+		  }
+
+   }
+   fprintf( stdout, "%s (%s)\n",  props[3].value, props[2].value);
+
+   if ((status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL,
+                                0, NULL, &numDevices)) != CL_SUCCESS) {
+      Warning("platform[%p]: Unable to query the number of devices: %s\n",
+              platform, CLErrString(status));
+      return;
+   }
+   printf("    Found %d device(s).\n",numDevices);
+
+
+
+   deviceList = malloc(numDevices * sizeof(cl_device_id));
+   if ((status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL,
+                                numDevices, deviceList, NULL)) != CL_SUCCESS) {
+      Warning("platform[%p]: Unable to enumerate the devices: %s\n",
+              platform, CLErrString(status));
+      free(deviceList);
+      return;
+   }
+
+   for (ii = 0; ii < numDevices; ii++) {
+     PrintDeviceShort(deviceList[ii]);
+   }
+
+   free(deviceList);
+
+}
+
+
+typedef struct {
+	char name[255];
+	cl_device_type type;
+	cl_bool available;
+	size_t max_workgroup_items;
+	cl_uint max_compute_units;
+
+} BasicDeviceInfo;
+
+
+
+void PrintDeviceShort(cl_device_id device) {
+
+   cl_int status;
+   size_t size;
+
+   cl_device_id *deviceList;
+   BasicDeviceInfo device_info;
+
+   status = clGetDeviceInfo(device, CL_DEVICE_NAME, sizeof(device_info.name), device_info.name, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get device name (%s)", CLErrString(status));}
+   fprintf(stdout, "        name: %s\n", device_info.name);
+
+   status = clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(device_info.max_compute_units), &device_info.max_compute_units, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get max_workgroup_items (%s)", CLErrString(status));}
+   fprintf(stdout, "        max_compute_units: %d\n", device_info.max_compute_units);
+
+   status = clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(device_info.max_workgroup_items), &device_info.max_workgroup_items, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get max_workgroup_items (%s)", CLErrString(status));}
+   fprintf(stdout, "        max_workgroup_items: %ld\n", device_info.max_workgroup_items);
+
+   //TODO get device type etc ...
+
+}
+
+
+
 
 
 cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_context * context, cl_command_queue * cmdQueue ) {
