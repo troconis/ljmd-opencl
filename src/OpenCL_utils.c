@@ -258,7 +258,7 @@ char * source2string( char * filename ){
 
   fp_file = fopen( filename, "r" );
   if( !fp_file ){
-    fprintf( stderr, "Unable to open the source file %s. Program will be ended", filename );
+    fprintf( stderr, "Unable to open the source file %s. Program will end.\n", filename );
     exit(1);
   }
 
@@ -266,7 +266,7 @@ char * source2string( char * filename ){
 
     tmp = realloc( string_buffer, buffer_size + strlen( line_buffer ) + 1 );
     if( !tmp ) {
-      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will be ended" );
+      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will end.\n" );
       exit(1);
     }
     

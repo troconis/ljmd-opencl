@@ -206,7 +206,7 @@ int main(int argc, char **argv)
   size_t globalWorkSize[1];
   globalWorkSize[0] = nthreads;
   
-  char * sourcecode = source2string( "opencl_kernels.cl" );
+  char * sourcecode = source2string( "src/opencl_kernels.cl" );
 
   cl_program program = clCreateProgramWithSource( context, 1, (const char **) &sourcecode, NULL, &status );
   
