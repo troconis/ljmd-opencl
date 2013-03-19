@@ -1,5 +1,18 @@
 #include "OpenCL_utils.h"
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#include <ctype.h>
+#include <sys/types.h>
+
+
+
+
+
+
+
+
+#define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
 /*
  * CLErrString --
@@ -11,8 +24,24 @@
  *      const char * pointer to a static string.
  */
 
-static const char *
-CLErrString(cl_int status) {
+
+
+
+double second()
+ 
+/* Returns elepsed seconds past from the last call to timer rest */
+{
+
+    struct timeval tmp;
+    double sec;
+    gettimeofday( &tmp, (struct timezone *)0 );
+    sec = tmp.tv_sec + ((double)tmp.tv_usec)/1000000.0;
+    return sec;
+}
+
+
+
+const char * CLErrString(cl_int status) {
    static struct { cl_int code; const char *msg; } error_table[] = {
       { CL_SUCCESS, "success" },
       { CL_DEVICE_NOT_FOUND, "device not found", },
@@ -44,6 +73,7 @@ CLErrString(cl_int status) {
    return unknown;
 }
 
+void PrintDeviceShort(cl_device_id device);
 
 void PrintPlatform(cl_platform_id platform) {
 
@@ -76,6 +106,104 @@ void PrintPlatform(cl_platform_id platform) {
   
 }
 
+// prints a short one line platform summary
+void PrintPlatformShort(cl_platform_id platform) {
+
+   static struct { cl_platform_info param; const char *name;  char value[255];} props[] = {
+      { CL_PLATFORM_PROFILE, "profile","" },
+      { CL_PLATFORM_VERSION, "version","" },
+      { CL_PLATFORM_NAME, "name","" },
+      { CL_PLATFORM_VENDOR, "vendor","" },
+      { 0, NULL },
+   };
+
+   cl_int status;
+   size_t size;
+   int ii;
+   cl_device_id *deviceList;
+   cl_uint numDevices;
+
+   for (ii = 0; props[ii].name != NULL; ii++) {
+      status = clGetPlatformInfo(platform, props[ii].param, sizeof(props[ii].value), props[ii].value, &size);
+      //fprintf(stdout, "size of buf: %d \n", sizeof(props[ii].value));
+      if ( status != CL_SUCCESS ) {
+		fprintf( stderr, "platform[%p]: Unable to get %s: %s\n", platform, props[ii].name, CLErrString( status ) );
+			 continue;
+      }
+      if ( size > sizeof  props[ii].value) {
+		fprintf( stderr, "platform[%p]: Huge %s (%ld bytes)!  Truncating to %ld\n",
+				platform, props[ii].name, size, sizeof  props[ii].value );
+		  }
+
+   }
+   fprintf( stdout, "%s (%s)\n",  props[3].value, props[2].value);
+
+   if ((status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL,
+                                0, NULL, &numDevices)) != CL_SUCCESS) {
+      Warning("platform[%p]: Unable to query the number of devices: %s\n",
+              platform, CLErrString(status));
+      return;
+   }
+   printf("    Found %d device(s).\n",numDevices);
+
+
+
+   deviceList = malloc(numDevices * sizeof(cl_device_id));
+   if ((status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL,
+                                numDevices, deviceList, NULL)) != CL_SUCCESS) {
+      Warning("platform[%p]: Unable to enumerate the devices: %s\n",
+              platform, CLErrString(status));
+      free(deviceList);
+      return;
+   }
+
+   for (ii = 0; ii < numDevices; ii++) {
+     PrintDeviceShort(deviceList[ii]);
+   }
+
+   free(deviceList);
+
+}
+
+
+typedef struct {
+	char name[255];
+	cl_device_type type;
+	cl_bool available;
+	size_t max_workgroup_items;
+	cl_uint max_compute_units;
+
+} BasicDeviceInfo;
+
+
+
+void PrintDeviceShort(cl_device_id device) {
+
+   cl_int status;
+   size_t size;
+
+   cl_device_id *deviceList;
+   BasicDeviceInfo device_info;
+
+   status = clGetDeviceInfo(device, CL_DEVICE_NAME, sizeof(device_info.name), device_info.name, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get device name (%s)", CLErrString(status));}
+   fprintf(stdout, "        name: %s\n", device_info.name);
+
+   status = clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(device_info.max_compute_units), &device_info.max_compute_units, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get max_workgroup_items (%s)", CLErrString(status));}
+   fprintf(stdout, "        max_compute_units: %d\n", device_info.max_compute_units);
+
+   status = clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(device_info.max_workgroup_items), &device_info.max_workgroup_items, &size);
+   if (status != CL_SUCCESS) {Warning("Unable to get max_workgroup_items (%s)", CLErrString(status));}
+   fprintf(stdout, "        max_workgroup_items: %ld\n", device_info.max_workgroup_items);
+
+   //TODO get device type etc ...
+
+}
+
+
+
+
 
 cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_context * context, cl_command_queue * cmdQueue ) {
 
@@ -89,6 +217,8 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
     fprintf( stderr, "Unable to query the number of platforms: %s\n", CLErrString(status) );
     exit( 1 );
   }
+
+
 
 #ifdef __DEBUG
   fprintf( stdout, "Found %d platform(s).\n", numPlatforms );
@@ -157,9 +287,12 @@ char * source2string( char * filename ){
   size_t buffer_size = 0;
   FILE * fp_file;
 
+
+
+
   fp_file = fopen( filename, "r" );
   if( !fp_file ){
-    fprintf( stderr, "Unable to open the source file %s. Program will be ended", filename );
+    fprintf( stderr, "Unable to open the source file %s. Program will end.\n", filename );
     exit(1);
   }
 
@@ -167,7 +300,7 @@ char * source2string( char * filename ){
 
     tmp = realloc( string_buffer, buffer_size + strlen( line_buffer ) + 1 );
     if( !tmp ) {
-      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will be ended" );
+      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will end.\n" );
       exit(1);
     }
     
@@ -183,4 +316,7 @@ char * source2string( char * filename ){
 #endif
 
   return string_buffer;
+
+
+
 }

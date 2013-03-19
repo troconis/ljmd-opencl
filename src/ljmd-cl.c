@@ -207,7 +207,7 @@ int main(int argc, char **argv)
   size_t globalWorkSize[1];
   globalWorkSize[0] = nthreads;
   
-  char * sourcecode = source2string( "opencl_kernels.cl" );
+  char * sourcecode = source2string( "src/opencl_kernels.cl" );
 
   cl_program program = clCreateProgramWithSource( context, 1, (const char **) &sourcecode, NULL, &status );
   
@@ -244,7 +244,7 @@ int main(int argc, char **argv)
   status = clSetKernelArg( kernel_azzero, 0, sizeof( cl_mem ), &cl_sys.fx );
   status |= clSetKernelArg( kernel_azzero, 1, sizeof( cl_mem ), &cl_sys.fy );
   status |= clSetKernelArg( kernel_azzero, 2, sizeof( cl_mem ), &cl_sys.fz );
-  status |= clSetKernelArg( kernel_force, 3, sizeof( int ), &cl_sys.natoms );
+  status |= clSetKernelArg( kernel_azzero, 3, sizeof( int ), &cl_sys.natoms );
   status = clEnqueueNDRangeKernel( cmdQueue, kernel_azzero, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
   status |= clSetKernelArg( kernel_force, 0, sizeof( cl_mem ), &cl_sys.fx );
