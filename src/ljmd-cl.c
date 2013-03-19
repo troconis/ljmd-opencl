@@ -127,7 +127,7 @@ int main(int argc, char **argv)
   FILE *fp,*traj,*erg;
   mdsys_t sys;
   
-  if( argv[1] == NULL )
+  if( argc < 2 )
 	  PrintUsageAndExit();
 
   if( argc == 3 ) { /* if three arguments are passed (so the third is the number of threads)*/
@@ -138,10 +138,10 @@ int main(int argc, char **argv)
 
 	  }
   } else {	/* do the device default*/
-	  if( !strcmp( argv[1], "cpu" ) )
-		  nthreads = 16;
-	  else
-		  nthreads = 1024;
+	    if( !strcmp( argv[1], "cpu" ) )
+		    nthreads = 16;
+	    else
+		    nthreads = 1024;
   }
   /* Initialize the OpenCL environment */
   if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
