@@ -1,6 +1,10 @@
 #include "OpenCL_utils.h"
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
+#include <sys/time.h>
+#include <ctype.h>
+#include <sys/types.h>
 
 #define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
@@ -13,6 +17,23 @@
  * Results:
  *      const char * pointer to a static string.
  */
+
+
+
+
+double second()
+ 
+/* Returns elepsed seconds past from the last call to timer rest */
+{
+
+    struct timeval tmp;
+    double sec;
+    gettimeofday( &tmp, (struct timezone *)0 );
+    sec = tmp.tv_sec + ((double)tmp.tv_usec)/1000000.0;
+    return sec;
+}
+
+
 
 const char * CLErrString(cl_int status) {
    static struct { cl_int code; const char *msg; } error_table[] = {
@@ -191,6 +212,8 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
     exit( 1 );
   }
 
+
+
 #ifdef __DEBUG
   fprintf( stdout, "Found %d platform(s).\n", numPlatforms );
 #endif
@@ -257,9 +280,12 @@ char * source2string( char * filename ){
   size_t buffer_size = 0;
   FILE * fp_file;
 
+
+
+
   fp_file = fopen( filename, "r" );
   if( !fp_file ){
-    fprintf( stderr, "Unable to open the source file %s. Program will be ended", filename );
+    fprintf( stderr, "Unable to open the source file %s. Program will end.\n", filename );
     exit(1);
   }
 
@@ -267,7 +293,7 @@ char * source2string( char * filename ){
 
     tmp = realloc( string_buffer, buffer_size + strlen( line_buffer ) + 1 );
     if( !tmp ) {
-      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will be ended" );
+      fprintf( stderr, "Unable to allocate buffer to store OpenCL kernel source. Program will end.\n" );
       exit(1);
     }
     
@@ -283,6 +309,9 @@ char * source2string( char * filename ){
 #endif
 
   return string_buffer;
+
+
+
 }
 
 
