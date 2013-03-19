@@ -22,4 +22,8 @@ void PrintPlatform(cl_platform_id platform);
 // prints a short online platform summary
 void PrintPlatformShort(cl_platform_id platform);
 
+cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs, ... );
+
+#define KArg(x) sizeof(x),&(x)
+
 #endif
