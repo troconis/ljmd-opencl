@@ -60,7 +60,7 @@ $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 test:
 	cd $(TEST_DIR); make
 clean:
-	rm -f $(EXE) $(OBJECTS)
+	rm -f $(EXE) $(OBJECTS) $(INC_DIR)/opencl_kernels_as_string.h
 	cd $(TEST_DIR); make clean
 
 
