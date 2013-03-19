@@ -126,9 +126,8 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  /* hard-coded by neumannrf to fit my laptop's gpu */
   if( !strcmp( argv[1], "cpu" ) ) nthreads = 16; 
-  else nthreads = 2916;
+  else nthreads = 1024;
 
   /* read input file */
   if(get_me_a_line(stdin,line)) return 1;
@@ -379,6 +378,8 @@ int main(int argc, char **argv)
     }
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
+    sys.epot = ZERO;
+    sys.ekin = ZERO;
     /* download data on host */
     status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
     status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
@@ -388,15 +389,10 @@ int main(int argc, char **argv)
     sys.ry = buffers[1];
     sys.rz = buffers[2];
 
-    /* Zeroing out the sys.epot@host value and performing the reduction from tmp_epot[i]@device to sys.epot@host */
-    sys.epot = ZERO;
-    status != clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
+    status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
     for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
 
-    /* Zeroing out the sys.ekin@host value and performing the reduction from tmp_ekin[i]@device to sys.ekin@host */
-    sys.ekin = ZERO;
-    status != clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
-    
+    status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
     for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
     sys.ekin *= HALF * mvsq2e * sys.mass;
     sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
