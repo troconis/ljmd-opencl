@@ -335,17 +335,16 @@ int main(int argc, char **argv)
       KArg(cl_sys.natoms),
       KArg(sys.dt),
       KArg(dtmf));
-
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n1 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    
+    CheckSuccess(status, 2);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* 6) download position@device to position@host */
     status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
     status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
     status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+    
+    CheckSuccess(status, 6);
     sys.rx = buffers[0];
     sys.ry = buffers[1];
     sys.rz = buffers[2];
@@ -366,14 +365,12 @@ int main(int argc, char **argv)
       KArg(boxby2),
       KArg(sys.box));
 
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n2 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 3);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
     status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
+    CheckSuccess(status, 7);
     sys.epot = ZERO;
     for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
 
@@ -389,24 +386,19 @@ int main(int argc, char **argv)
       KArg(sys.dt),
       KArg(dtmf));
 
-    if( status != CL_SUCCESS ) {
-      fprintf( stderr, "\n3 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 4);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_second, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* 5) ekin */
     status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
       KArg(cl_sys.natoms), KArg(ekin_buffer));
 
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n4 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 5);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
     /* 8) download E_kin[i]@device and perform reduction to E_kin@host */
     status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+    CheckSuccess(status, 8);
     sys.ekin = ZERO;
     for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
     sys.ekin *= HALF * mvsq2e * sys.mass;

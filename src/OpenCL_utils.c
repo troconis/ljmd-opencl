@@ -342,4 +342,10 @@ cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs
     return status;
 }
 
+void CheckSuccess (cl_int status, const int part) {
+	if( status != CL_SUCCESS ) {
+		fprintf( stderr, "\n%d - ERROR!!!!\n\n", part );
+		exit( 1 );
+	}
+}
 
