@@ -2,14 +2,14 @@
 ########### makefile for NVidia Optimus ###########
 ###################################################
 
-CC=icc
+CC=gcc
 
 # Flags for Include, Optimization, Parallelism and Debug
 IFLAGS= -I./include
-OFLAGS= -O3 #-D_USE_FLOAT
+OFLAGS= -O3 -D_USE_FLOAT
 PFLAGS= -openmp
 DFLAGS= -Wall -D__DEBUG
-CFLAGS= $(IFLAGS) $(OFLAGS) $(PFLAGS) $(DFLAGS)
+CFLAGS= $(IFLAGS) $(OFLAGS) # $(PFLAGS) $(DFLAGS)
 
 LIBS=-lOpenCL -lm
 

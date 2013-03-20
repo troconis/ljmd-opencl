@@ -325,6 +325,7 @@ int main(int argc, char **argv)
 
   /**************************************************/
   /* main MD loop */
+  clSetUserEventStatus(event, CL_COMPLETE);
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
 
     /* This is a placeholder for the barrier that will be needed
@@ -353,6 +354,7 @@ int main(int argc, char **argv)
       KArg(dtmf));
 
     CheckSuccess(status, 2);
+    //    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event, NULL );
 
     /* 6) download position@device to position@host */
@@ -418,11 +420,14 @@ int main(int argc, char **argv)
 
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
 	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event );
+	//status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE,  0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
 	CheckSuccess(status, 8);
     }
 
     /* 1) write output every nprint steps */
     if ((sys.nfi % nprint) == 0) {
+
+      clWaitForEvents(1, &event);
 
 	/* initialize the sys.epot@host and sys.ekin@host variables to ZERO */
 	sys.epot = ZERO;

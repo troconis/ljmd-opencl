@@ -36,8 +36,11 @@ $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 
 
 ##Calls
-run: $(EXE)
+run: $(EXE) $(INPUTS)
 	./$(EXE) cpu < argon_108.inp
+
+optirun: $(EXE) $(INPUTS)
+	time optirun ./$(EXE) gpu 1536 < argon_2916.inp
 
 test: $(EXE) $(INPUTS) $(REFERENCE_RESULTS)
 	./$(EXE) cpu < argon_108.inp
