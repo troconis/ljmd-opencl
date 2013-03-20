@@ -117,6 +117,7 @@ int main(int argc, char **argv)
   cl_device_type device_type; /*to test if we are on cpu or gpu*/
   cl_context context;
   cl_command_queue cmdQueue;
+  cl_event event;
 
   FPTYPE * buffers[3];
   cl_mdsys_t cl_sys;
@@ -150,6 +151,10 @@ int main(int argc, char **argv)
     fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly.\n" );
     return 4;
   }
+
+  /* initialize the cl_event handler variable */
+  event = clCreateUserEvent( context, NULL );
+
 
   /* read input file */
   if(get_me_a_line(stdin,line)) return 1;
@@ -348,7 +353,7 @@ int main(int argc, char **argv)
       KArg(dtmf));
 
     CheckSuccess(status, 2);
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event, NULL );
 
     /* 6) download position@device to position@host */
     if ((sys.nfi % nprint) == nprint-1) {
@@ -412,7 +417,7 @@ int main(int argc, char **argv)
 
 
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
-	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event );
 	CheckSuccess(status, 8);
     }
 
