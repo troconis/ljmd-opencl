@@ -35,6 +35,9 @@ $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 
 
 ##Calls
+run: $(EXE)
+	./$(EXE) cpu < argon_108.inp
+
 test: $(EXE) $(INPUTS) $(REFERENCE_RESULTS)
 	./$(EXE) cpu < argon_108.inp > argon_108_CL.out
 	diff argon_108_base.out argon_108_CL.out

@@ -43,6 +43,8 @@ $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 
 
 ## Calls
+run: $(EXE)
+	cp $(EXE) $(TEST_DIR)/ ; cd $(TEST_DIR) ; make run
 test: $(EXE)
 	cp $(EXE) $(TEST_DIR)/
 	cd $(TEST_DIR); make test
