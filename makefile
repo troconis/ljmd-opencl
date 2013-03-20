@@ -47,5 +47,5 @@ test: $(EXE)
 	cp $(EXE) $(TEST_DIR)/
 	cd $(TEST_DIR); make test
 clean:
-	rm -f $(EXE) $(OBJECTS)
+	rm -f $(EXE) $(OBJECTS) $(INC_DIR)/opencl_kernels_as_string.h
 	cd $(TEST_DIR); make clean
