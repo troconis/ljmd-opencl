@@ -117,7 +117,11 @@ int main(int argc, char **argv)
   cl_device_type device_type; /*to test if we are on cpu or gpu*/
   cl_context context;
   cl_command_queue cmdQueue;
-  cl_event event;
+  
+#ifdef _UNBLOCK
+  cl_uint  num_events = 3;
+  cl_event event[num_events];
+#endif
 
   FPTYPE * buffers[3];
   cl_mdsys_t cl_sys;
@@ -152,9 +156,13 @@ int main(int argc, char **argv)
     return 4;
   }
 
-  /* initialize the cl_event handler variable */
-  event = clCreateUserEvent( context, NULL );
-
+#ifdef _UNBLOCK
+  /* initialize the cl_event handler variables */
+  for( i = 0; i < num_events; ++i) {
+	  event[i] = clCreateUserEvent( context, NULL );
+	  clSetUserEventStatus( event[i], CL_COMPLETE );
+  }
+#endif
 
   /* read input file */
   if(get_me_a_line(stdin,line)) return 1;
@@ -325,17 +333,7 @@ int main(int argc, char **argv)
 
   /**************************************************/
   /* main MD loop */
-  clSetUserEventStatus(event, CL_COMPLETE);
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
-
-    /* This is a placeholder for the barrier that will be needed
-     * once the ReadBuffer & WriteBuffer calls are transformed to
-     * non blocking ones */
-
-    /*
-     * if ((sys.nfi % nprint) == 0) BARRIER(event[8]);
-     */
-
 
     /* propagate system and recompute energies */
     /* 2) verlet_first   */
@@ -352,21 +350,26 @@ int main(int argc, char **argv)
       KArg(cl_sys.natoms),
       KArg(sys.dt),
       KArg(dtmf));
-
     CheckSuccess(status, 2);
-    //    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event, NULL );
+
+#ifdef _UNBLOCK
+    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event[2], NULL );
+#else
+    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+#endif
 
     /* 6) download position@device to position@host */
     if ((sys.nfi % nprint) == nprint-1) {
-	status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+#ifdef _UNBLOCK
+	status  = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, &event[2] );
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, &event[1] );
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, &event[0] );
+#else
+	status  = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
 	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
 	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
-
+#endif
 	CheckSuccess(status, 6);
-	sys.rx = buffers[0];
-	sys.ry = buffers[1];
-	sys.rz = buffers[2];
     }
 
     /* 3) force */
@@ -390,7 +393,11 @@ int main(int argc, char **argv)
 
     /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
     if ((sys.nfi % nprint) == nprint-1) {
+#ifdef _UNBLOCK
+	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, &event[1] );
+#else
 	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
+#endif
 	CheckSuccess(status, 7);
     }
 
@@ -419,15 +426,23 @@ int main(int argc, char **argv)
 
 
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
-	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event );
-	//status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE,  0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+#ifdef _UNBLOCK
+	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event[2] );
+#else
+	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+#endif
 	CheckSuccess(status, 8);
     }
 
     /* 1) write output every nprint steps */
     if ((sys.nfi % nprint) == 0) {
 
-      clWaitForEvents(1, &event);
+#ifdef _UNBLOCK
+        clWaitForEvents(3, event);
+#endif
+	sys.rx = buffers[0];
+	sys.ry = buffers[1];
+	sys.rz = buffers[2];
 
 	/* initialize the sys.epot@host and sys.ekin@host variables to ZERO */
 	sys.epot = ZERO;
