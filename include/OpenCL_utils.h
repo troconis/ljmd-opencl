@@ -4,6 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "CL/cl.h"
+#include <time.h>
+#include <sys/time.h>
+#include <ctype.h>
+#include <sys/types.h>
+
+/* This section contains the timing function */
+double second();
 
 //#define CL_DEVICE_KIND CL_DEVICE_TYPE_CPU
 //#define CL_DEVICE_KIND CL_DEVICE_TYPE_ALL

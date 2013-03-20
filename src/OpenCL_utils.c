@@ -1,10 +1,7 @@
 #include "OpenCL_utils.h"
-#include <string.h>
+
 #include <stdarg.h>
-#include <time.h>
-#include <sys/time.h>
-#include <ctype.h>
-#include <sys/types.h>
+#include <string.h>
 
 #define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
@@ -17,21 +14,6 @@
  * Results:
  *      const char * pointer to a static string.
  */
-
-
-
-
-double second()
- 
-/* Returns elepsed seconds past from the last call to timer rest */
-{
-
-    struct timeval tmp;
-    double sec;
-    gettimeofday( &tmp, (struct timezone *)0 );
-    sec = tmp.tv_sec + ((double)tmp.tv_usec)/1000000.0;
-    return sec;
-}
 
 
 
@@ -343,3 +325,16 @@ cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs
 }
 
 
+/* This section contains the timing function */
+
+double second()
+
+/* Returns elepsed seconds past from the last call to timer rest */
+{
+
+    struct timeval tmp;
+    double sec;
+    gettimeofday( &tmp, (struct timezone *)0 );
+    sec = tmp.tv_sec + ((double)tmp.tv_usec)/1000000.0;
+    return sec;
+}

@@ -37,7 +37,7 @@ OBJECTS	=$(patsubst %,$(OBJ_DIR)/%,$(CODE_FILES:.c=.o))
 INCLUDES=$(patsubst %,$(INC_DIR)/%,$(HEADER_FILES))
 
 #Compilation Flags
-CFLAGS= -I./include -I/usr/include/x86_64-linux-gnu/ -I/opt/cuda/5.0/include/
+CFLAGS= -I./include -I/usr/include/x86_64-linux-gnu/ -I/opt/cuda/5.0/include/ -D__PROFILING
 OPENMP=-openmp
 OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 OPENCL_LIBS=-L/opt/cuda/5.0/lib -lOpenCL
