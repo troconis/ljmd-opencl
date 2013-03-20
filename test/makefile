@@ -13,38 +13,55 @@ INC_DIR=include
 INPUT_SRC=../examples
 TEST_DIR=.
 ORI_SRC_DIC=$(TEST_DIR)/src
+OPENMP=-openmp
+OPT= -O3 $(OPENMP) -Wall
+
 
 #Files
-EXE=ljmd_CL
+EXE=ljmd-cl
 ORI_EXE=ljmd-ori
 #inputs and Benchmarks
 # required input and data files.
-INPUTS= argon_108.inp argon_2916.inp argon_78732.inp \
-	argon_108.rest argon_2916.rest argon_78732.rest
-REFERENCE_RESULTS=argon_108_base.dat argon_108_base.xyz
+INPUT_NAMES	= argon_108
+INPUT_INP	= $(patsubst %,%.inp,$(INPUT_NAMES))
+INPUT_REST	= $(INPUT_INP:.inp=.rest)
+INPUTS		= $(INPUT_INP) $(INPUT_REST)
+REF_RESULTS	= $(INPUT_INP:.inp=.dat.base) $(INPUT_INP:.inp=.xyz.base)
 
+#
+EXECUTABLES	= $(EXE) $(EXE).opti $(ORI_EXE).opti
 #Instructions
 $(INPUTS):
 	ln -s $(INPUT_SRC)/$@ $@
 	
-$(REFERENCE_RESULTS): $(ORI_EXE) $(INPUTS)
-	./$(ORI_EXE) < argon_108.inp
-	mv argon_108.dat argon_108_base.dat; mv argon_108.xyz argon_108_base.xyz
+$(REF_RESULTS): $(ORI_EXE) $(INPUTS)
+	for file in $(INPUT_NAMES); do \
+	  ./$(ORI_EXE) < $$file.inp > /dev/null; \
+	  mv $$file.dat $$file.dat.base;  \
+	  mv $$file.xyz $$file.xyz.base;  \
+	done
 
 $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
 
+$(ORI_EXE).opti: $(ORI_SRC_DIC)/ljmd-c1.c
+	$(CC) $(OPT) -o $(TEST_DIR)/$@ $< $(LIB)
+
 
 ##Calls
-run: $(EXE)
+run: $(EXE) $(INPUTS)
 	./$(EXE) cpu < argon_108.inp
 
-test: $(EXE) $(INPUTS) $(REFERENCE_RESULTS)
-	./$(EXE) cpu < argon_108.inp
-	mv argon_108.dat argon_108_CL.dat; mv argon_108.xyz argon_108_CL.xyz
+test: $(EXECUTABLES) $(INPUTS) $(REF_RESULTS)
+	for exe in $(EXECUTABLES); do \
+	   for file in $(INPUT_NAMES); do \
+	       ./$$exe cpu < $$file.inp > /dev/null; \
+	       mv $$file.dat $$file.dat.$$exe;  \
+	       mv $$file.xyz $$file.xyz.$$exe;  \
+	   done;  \
+	done
 	python src/tester.py
 
 clean:
-	rm -f $(TEST_DIR)/$(ORI_EXE)
-	rm -f $(INPUTS) *.dat *.xyz
-	rm -f $(EXE)
+	rm -f $(EXECUTABLES) $(ORI_EXE)
+	rm -f $(INPUTS) $(REF_RESULTS)
