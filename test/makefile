@@ -32,7 +32,7 @@ run: $(EXE) $(INPUTS)
 	./$(EXE) cpu < argon_108.inp
 
 optirun: $(EXE) $(INPUTS)
-	time optirun ./$(EXE) gpu 2916 < argon_2916.inp
+	time optirun ./$(EXE) gpu 1536 < argon_2916.inp
 
 clean:
 	rm -f $(TEST_DIR)/$(ORI_EXE)

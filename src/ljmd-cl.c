@@ -126,23 +126,25 @@ int main(int argc, char **argv)
   char restfile[BLEN], trajfile[BLEN], ergfile[BLEN], line[BLEN];
   FILE *fp,*traj,*erg;
   mdsys_t sys;
-  
-  if( argc < 2 )
-	  PrintUsageAndExit();
-
-  if( argc == 3 ) { /* if three arguments are passed (so the third is the number of threads)*/
-	  nthreads = strtol(argv[2],NULL,10);
-	  if( nthreads<0 ) {
-		  fprintf( stderr, "\n. The number of threads must be more than 1.\n");
-		  PrintUsageAndExit();
-
-	  }
-  } else {	/* do the device default*/
-	    if( !strcmp( argv[1], "cpu" ) )
-		    nthreads = 16;
-	    else
-		    nthreads = 1024;
+ 
+  /* handling the command line arguments */
+  switch (argc) {
+      case 2: /* only the cpu/gpu argument was passed, setting default nthreads */
+	      if( !strcmp( argv[1], "cpu" ) ) nthreads = 16;
+	      else nthreads = 1024;
+	      break;
+      case 3: /* both the device type (cpu/gpu) and the number of threads were passed */
+	      nthreads = strtol(argv[2],NULL,10);
+	      if( nthreads<0 ) {
+		      fprintf( stderr, "\n. The number of threads must be more than 1.\n");
+		      PrintUsageAndExit();
+	      }
+	      break;
+      default:
+	      PrintUsageAndExit();
+	      break;
   }
+  
   /* Initialize the OpenCL environment */
   if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
     fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly.\n" );
