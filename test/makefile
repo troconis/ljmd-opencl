@@ -9,7 +9,7 @@ LIB=-lm
 #Directories
 SRC_DIR=src
 OBJ_DIR=obj
-INC_DIR=include
+INC_DIR=-I../include/ -D__PROFILING
 INPUT_SRC=../examples
 TEST_DIR=.
 ORI_SRC_DIC=$(TEST_DIR)/src
@@ -26,13 +26,13 @@ REFERENCE_RESULTS=argon_108_base.dat argon_108_base.xyz
 #Instructions
 $(INPUTS):
 	ln -s $(INPUT_SRC)/$@ $@
-	
+
 $(REFERENCE_RESULTS): $(ORI_EXE) $(INPUTS)
 	./$(ORI_EXE) < argon_108.inp
 	mv argon_108.dat argon_108_base.dat; mv argon_108.xyz argon_108_base.xyz
 
 $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
-	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
+	$(CC) -o $(TEST_DIR)/$@ $< $(LIB) $(INC_DIR)
 
 
 ##Calls

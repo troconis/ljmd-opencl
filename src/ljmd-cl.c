@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <math.h>
+
 #include "OpenCL_utils.h"
 
 #ifdef _USE_FLOAT
@@ -109,6 +110,10 @@ static void output(mdsys_t *sys, FILE *erg, FILE *traj)
     }
 }
 
+
+
+
+
 /* main */
 int main(int argc, char **argv) 
 {
@@ -126,7 +131,18 @@ int main(int argc, char **argv)
   char restfile[BLEN], trajfile[BLEN], ergfile[BLEN], line[BLEN];
   FILE *fp,*traj,*erg;
   mdsys_t sys;
- 
+
+
+/* Start profiling */
+
+#ifdef __PROFILING
+  
+  double t1, t2;
+
+  t1 = second();
+
+#endif
+
   /* handling the command line arguments */
   switch (argc) {
       case 2: /* only the cpu/gpu argument was passed, setting default nthreads */
@@ -440,6 +456,21 @@ int main(int argc, char **argv)
 
   }
   /**************************************************/
+
+/* End profiling */
+
+#ifdef __PROFILING
+
+t2 = second();
+
+fprintf( stdout, "\n\nTime of execution = %.3g (seconds)\n", (t2 - t1) );
+
+#endif
+
+
+
+
+
 
   /* clean up: close files, free memory */
   printf("Simulation Done.\n");
