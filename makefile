@@ -38,6 +38,9 @@ $(EXE): $(OBJECTS)
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
 	$(CC) $(INCLUDE_PATH) $< -o $@ -c
 
+optirun: $(EXE)
+	cp $(EXE) $(TEST_DIR)/ ; cd $(TEST_DIR) ; make optirun
+
 $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 	awk '{print "\""$$0"\\n\""}' <$< >$@
 
