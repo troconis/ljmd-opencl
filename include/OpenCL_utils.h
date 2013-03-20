@@ -31,6 +31,9 @@ void PrintPlatformShort(cl_platform_id platform);
 
 cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs, ... );
 
+/* Checks for the successful execution of each part */
+void CheckSuccess (cl_int status, const int part);
+
 #define KArg(x) sizeof(x),&(x)
 
 #endif

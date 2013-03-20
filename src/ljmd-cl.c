@@ -132,6 +132,7 @@ int main(int argc, char **argv)
   FILE *fp,*traj,*erg;
   mdsys_t sys;
 
+
 /* Start profiling */
 
 #ifdef __PROFILING
@@ -142,22 +143,24 @@ int main(int argc, char **argv)
 
 #endif
 
-  if( argc < 2 )
-	  PrintUsageAndExit();
-
-  if( argc == 3 ) { /* if three arguments are passed (so the third is the number of threads)*/
-	  nthreads = strtol(argv[2],NULL,10);
-	  if( nthreads<0 ) {
-		  fprintf( stderr, "\n. The number of threads must be more than 1.\n");
-		  PrintUsageAndExit();
-
-	  }
-  } else {	/* do the device default*/
-	    if( !strcmp( argv[1], "cpu" ) )
-		    nthreads = 16;
-	    else
-		    nthreads = 1024;
+  /* handling the command line arguments */
+  switch (argc) {
+      case 2: /* only the cpu/gpu argument was passed, setting default nthreads */
+	      if( !strcmp( argv[1], "cpu" ) ) nthreads = 16;
+	      else nthreads = 1024;
+	      break;
+      case 3: /* both the device type (cpu/gpu) and the number of threads were passed */
+	      nthreads = strtol(argv[2],NULL,10);
+	      if( nthreads<0 ) {
+		      fprintf( stderr, "\n. The number of threads must be more than 1.\n");
+		      PrintUsageAndExit();
+	      }
+	      break;
+      default:
+	      PrintUsageAndExit();
+	      break;
   }
+  
   /* Initialize the OpenCL environment */
   if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
     fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly.\n" );
@@ -335,12 +338,17 @@ int main(int argc, char **argv)
   /* main MD loop */
   for(sys.nfi=1; sys.nfi <= sys.nsteps; ++sys.nfi) {
 
-    /* write output, if requested */
-    if ((sys.nfi % nprint) == 0) 
-      output(&sys, erg, traj);
+    /* This is a placeholder for the barrier that will be needed
+     * once the ReadBuffer & WriteBuffer calls are transformed to
+     * non blocking ones */
+
+    /*
+     * if ((sys.nfi % nprint) == 0) BARRIER(event[8]);
+     */
+
 
     /* propagate system and recompute energies */
-    /*    verlet_first   */
+    /* 2) verlet_first   */
     status |= clSetMultKernelArgs( kernel_verlet_first, 0, 12,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -355,13 +363,22 @@ int main(int argc, char **argv)
       KArg(sys.dt),
       KArg(dtmf));
 
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n1 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 2);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* force */
+    /* 6) download position@device to position@host */
+    if ((sys.nfi % nprint) == nprint-1) {
+	status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
+
+	CheckSuccess(status, 6);
+	sys.rx = buffers[0];
+	sys.ry = buffers[1];
+	sys.rz = buffers[2];
+    }
+
+    /* 3) force */
     status |= clSetMultKernelArgs( kernel_force, 0, 13,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -377,13 +394,16 @@ int main(int argc, char **argv)
       KArg(boxby2),
       KArg(sys.box));
 
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n2 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 3);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* verlet_second */
+    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
+    if ((sys.nfi % nprint) == nprint-1) {
+	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
+	CheckSuccess(status, 7);
+    }
+
+    /* 4) verlet_second */
     status |= clSetMultKernelArgs( kernel_verlet_second, 0, 9,
       KArg(cl_sys.fx),
       KArg(cl_sys.fy),
@@ -395,41 +415,45 @@ int main(int argc, char **argv)
       KArg(sys.dt),
       KArg(dtmf));
 
-    if( status != CL_SUCCESS ) {
-      fprintf( stderr, "\n3 - ERROR!!!!\n\n" );
-      exit( 1 );
-    }
+    CheckSuccess(status, 4);
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_second, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    /* ekin */
-    status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
-      KArg(cl_sys.natoms), KArg(ekin_buffer));
+    if ((sys.nfi % nprint) == nprint-1) {
 
-    if( status != CL_SUCCESS ){
-      fprintf( stderr, "\n4 - ERROR!!!!\n\n" );
-      exit( 1 );
+	/* 5) ekin */
+	status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
+			KArg(cl_sys.natoms), KArg(ekin_buffer));
+	CheckSuccess(status, 5);
+	status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+
+
+	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
+	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+	CheckSuccess(status, 8);
     }
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    sys.epot = ZERO;
-    sys.ekin = ZERO;
-    /* download data on host */
-    status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-    status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
+    /* 1) write output every nprint steps */
+    if ((sys.nfi % nprint) == 0) {
 
-    sys.rx = buffers[0];
-    sys.ry = buffers[1];
-    sys.rz = buffers[2];
+	/* initialize the sys.epot@host and sys.ekin@host variables to ZERO */
+	sys.epot = ZERO;
+	sys.ekin = ZERO;
 
-    status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
-    for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
+	/* reduction on the tmp_Exxx[i] buffers downloaded from the device
+	 * during parts 7 and 8 of the previous MD loop iteration */
+	for( i = 0; i < nthreads; i++) {
+		sys.epot += tmp_epot[i];
+		sys.ekin += tmp_ekin[i];
+	}
 
-    status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
-    for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
-    sys.ekin *= HALF * mvsq2e * sys.mass;
-    sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
-    
+	/* multiplying the kinetic energy by prefactors */
+	sys.ekin *= HALF * mvsq2e * sys.mass;
+	sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
+
+	/* writing output files (positions, energies and temperature) */
+	output(&sys, erg, traj);
+    }
+
   }
   /**************************************************/
 

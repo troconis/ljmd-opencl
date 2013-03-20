@@ -1,7 +1,10 @@
 #include "OpenCL_utils.h"
 
 #include <stdarg.h>
+
 #include <string.h>
+#include <stdbool.h>
+
 
 #define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
@@ -177,18 +180,46 @@ void PrintDeviceShort(cl_device_id device) {
 
 }
 
+bool PlatformHasDeviceType(cl_platform_id platform, cl_device_type device_type) {
+	/* Initialize the Devices */
+	int num_devices;
+	cl_int status;
+	// this call returns the number of devices of a given type
+	if ((status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices))!= CL_SUCCESS) {
+		fprintf(stderr, "Unable to query the number of devices of type %ld (%s)\n", device_type, CLErrString(status));
+		exit(1);
+	}
+	return (num_devices>0);
+
+}
+
+// takes a platforms_list and returns the device that is a given device_type
+cl_platform_id FindPlatformWithDeviceType(cl_platform_id * platforms_list, int num_platforms, cl_device_type device_type) {
+	int i;
+	cl_int status;
+	cl_device_type temp_device_type;
 
 
 
+	for (i = 0; i < num_platforms; ++i) {
+	   if( PlatformHasDeviceType(platforms_list[i], device_type) )
+		   return platforms_list[i];
+	}
+	// if we get to here it is an error (no platform has the requested device)
+    fprintf( stderr, "Unable to find the platform with the device type: %ld\n", device_type);
+    exit( 1 );
+
+}
 
 cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_context * context, cl_command_queue * cmdQueue ) {
 
   cl_int status;
   cl_uint numPlatforms, numDevices;
   cl_device_type device_kind;
-  cl_platform_id * tmp_platforms, * platform;
+  cl_platform_id * platforms_list;
+  cl_platform_id platform;
 
-  /* Initialize the Platform. Program consider a single platform. The first platform is taken whether numPlatforms > 1 */
+  /* Initialize the Platform. Program considers a single platform. */
   if ( ( status = clGetPlatformIDs( 0, NULL, &numPlatforms ) ) != CL_SUCCESS ) {
     fprintf( stderr, "Unable to query the number of platforms: %s\n", CLErrString(status) );
     exit( 1 );
@@ -200,29 +231,31 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   fprintf( stdout, "Found %d platform(s).\n", numPlatforms );
 #endif
 
-  tmp_platforms = (cl_platform_id *) malloc( sizeof(cl_platform_id) * numPlatforms );
-  if ( ( status = clGetPlatformIDs( numPlatforms, tmp_platforms, NULL ) ) != CL_SUCCESS ) {
+  platforms_list = (cl_platform_id *) malloc( sizeof(cl_platform_id) * numPlatforms );
+  if ( (clGetPlatformIDs( numPlatforms, platforms_list, NULL ) ) != CL_SUCCESS ) {
     fprintf( stderr, "Unable to enumerate the platforms: %s\n", CLErrString(status));
     exit( 1 );
   }
   
   if( !strcmp( device_type, "gpu" ) ) {
-    fprintf( stderr, "\n GPU RANGE" );
-    platform = &tmp_platforms[1];
+    fprintf( stdout, "\nUSING GPU" );
     device_kind = CL_DEVICE_TYPE_GPU;
+    platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
   }
-  else { 
-    platform = &tmp_platforms[0];
+  else { //cpu
+    fprintf( stdout, "\nUSING CPU" );
     device_kind = CL_DEVICE_TYPE_CPU;
+    platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
   }
 
+  free(platforms_list);
 #ifdef __DEBUG
   PrintPlatform( (* platform) );
 #endif 
 
   /* Initialize the Devices */
-  if ((status = clGetDeviceIDs( (* platform ), device_kind, 0, NULL, &numDevices ) ) != CL_SUCCESS) {
-    fprintf( stderr, "platform[%p]: Unable to query the number of devices: %s\n", (* platform), CLErrString( status ) );
+  if ((status = clGetDeviceIDs( platform , device_kind, 0, NULL, &numDevices ) ) != CL_SUCCESS) {
+    fprintf( stderr, "platform[%p]: Unable to query the number of devices: %s\n", platform, CLErrString( status ) );
     exit( 1 );
    }
 
@@ -230,22 +263,22 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   fprintf( stdout, "platform[%p]: Found a device.\n", (* platform) );
 #endif
 
-   if ((status = clGetDeviceIDs( (* platform), device_kind, 1, device, NULL)) != CL_SUCCESS) {
-     fprintf ( stderr, "platform[%p]: Unable to enumerate the devices: %s\n", (* platform), CLErrString( status ) );
+   if ((status = clGetDeviceIDs(  platform, device_kind, 1, device, NULL)) != CL_SUCCESS) {
+     fprintf ( stderr, "platform[%p]: Unable to enumerate the devices: %s\n",  platform, CLErrString( status ) );
      exit( 1 );
    }
 
    (* context) = clCreateContext( NULL, 1, device, NULL, NULL, &status );
   
    if ( status != CL_SUCCESS ) {
-     fprintf ( stderr, "platform[%p]: Unable to init OpenCL context: %s\n", (* platform), CLErrString( status ) );
+     fprintf ( stderr, "platform[%p]: Unable to init OpenCL context: %s\n", platform, CLErrString( status ) );
      exit( 1 );     
    }
 
    (* cmdQueue) = clCreateCommandQueue( (* context), (* device), 0, &status );
   
    if ( status != CL_SUCCESS ) {
-     fprintf ( stderr, "platform[%p]: Unable to init OpenCL command queue: %s\n", (* platform), CLErrString( status ) );
+     fprintf ( stderr, "platform[%p]: Unable to init OpenCL command queue: %s\n", platform, CLErrString( status ) );
      exit( 1 );
    }
 
@@ -324,6 +357,12 @@ cl_int clSetMultKernelArgs( cl_kernel kernel, cl_uint first_index, cl_uint nargs
     return status;
 }
 
+void CheckSuccess (cl_int status, const int part) {
+	if( status != CL_SUCCESS ) {
+		fprintf( stderr, "\n%d - ERROR!!!!\n\n", part );
+		exit( 1 );
+	}
+}
 
 /* This section contains the timing function */
 
