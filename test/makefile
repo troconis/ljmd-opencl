@@ -9,7 +9,7 @@ LIB=-lm
 #Directories
 SRC_DIR=src
 OBJ_DIR=obj
-INC_DIR=include
+INC_DIR=-I../include/ -D__PROFILING
 INPUT_SRC=../examples
 TEST_DIR=.
 ORI_SRC_DIC=$(TEST_DIR)/src
@@ -33,19 +33,19 @@ EXECUTABLES	= $(EXE) $(EXE).opti $(ORI_EXE).opti
 #Instructions
 $(INPUTS):
 	ln -s $(INPUT_SRC)/$@ $@
-	
+
 $(REF_RESULTS): $(ORI_EXE) $(INPUTS)
 	for file in $(INPUT_NAMES); do \
-	  ./$(ORI_EXE) < $$file.inp > /dev/null; \
+	  ./$(ORI_EXE) < $$file.inp;  \
 	  mv $$file.dat $$file.dat.base;  \
 	  mv $$file.xyz $$file.xyz.base;  \
 	done
 
 $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
-	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
+	$(CC) -o $(TEST_DIR)/$@ $< $(LIB) $(INC_DIR)
 
 $(ORI_EXE).opti: $(ORI_SRC_DIC)/ljmd-c1.c
-	$(CC) $(OPT) -o $(TEST_DIR)/$@ $< $(LIB)
+	$(CC) $(OPT) -o $(TEST_DIR)/$@ $< $(LIB) $(INC_DIR)
 
 
 ##Calls
@@ -55,7 +55,7 @@ run: $(EXE) $(INPUTS)
 test: $(EXECUTABLES) $(INPUTS) $(REF_RESULTS)
 	for exe in $(EXECUTABLES); do \
 	   for file in $(INPUT_NAMES); do \
-	       ./$$exe cpu < $$file.inp > /dev/null; \
+	       ./$$exe cpu < $$file.inp;  \
 	       mv $$file.dat $$file.dat.$$exe;  \
 	       mv $$file.xyz $$file.xyz.$$exe;  \
 	   done;  \
@@ -64,4 +64,4 @@ test: $(EXECUTABLES) $(INPUTS) $(REF_RESULTS)
 
 clean:
 	rm -f $(EXECUTABLES) $(ORI_EXE)
-	rm -f $(INPUTS) $(REF_RESULTS)
+	rm -f $(INPUT_NAMES)*

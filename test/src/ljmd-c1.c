@@ -11,6 +11,9 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -200,6 +203,23 @@ static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 }
 
 
+/* This section contains the timing function */
+
+double second()
+
+/* Returns elepsed seconds past from the last call to timer rest */
+{
+
+    struct timeval tmp;
+    double sec;
+    gettimeofday( &tmp, (struct timezone *)0 );
+    sec = tmp.tv_sec + ((double)tmp.tv_usec)/1000000.0;
+    return sec;
+}
+
+
+
+
 /* main */
 int main(int argc, char **argv) 
 {
@@ -207,6 +227,17 @@ int main(int argc, char **argv)
     char restfile[BLEN], trajfile[BLEN], ergfile[BLEN], line[BLEN];
     FILE *fp,*traj,*erg;
     mdsys_t sys;
+
+/* Start profiling */
+
+#ifdef __PROFILING
+
+  double t1, t2;
+
+  t1 = second();
+
+#endif
+
 
 #if defined(_OPENMP)
 #pragma omp parallel
@@ -295,6 +326,18 @@ int main(int argc, char **argv)
 	ekin(&sys);
     }
     /**************************************************/
+
+/* End profiling */
+
+#ifdef __PROFILING
+
+t2 = second();
+
+fprintf( stdout, "\n\nTime of execution = %.3g (seconds)\n", (t2 - t1) );
+
+#endif
+
+
 
     /* clean up: close files, free memory */
     printf("Simulation Done.\n");
