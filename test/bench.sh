@@ -12,6 +12,6 @@ rm $benchfile
 for t in $threads 
 do
     #echo "$t: device $device threads $threads infile $infile benchfile $benchfile"
-    /usr/bin/time  --output=$benchfile --append --format="%C %e seconds %K kilobytes" ./ljmd_CL cpu $t < $infile 
+    /usr/bin/time  --output=$benchfile --append --format="%C %e seconds %K kilobytes" ./ljmd_CL $device $t < $infile 
 done
 
