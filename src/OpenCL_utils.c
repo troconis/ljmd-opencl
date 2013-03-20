@@ -204,9 +204,9 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   cl_int status;
   cl_uint numPlatforms, numDevices;
   cl_device_type device_kind;
-  cl_platform_id * tmp_platforms, * platform;
+  cl_platform_id * platforms_list, * platform;
 
-  /* Initialize the Platform. Program consider a single platform. The first platform is taken whether numPlatforms > 1 */
+  /* Initialize the Platform. Program consider a single platform. */
   if ( ( status = clGetPlatformIDs( 0, NULL, &numPlatforms ) ) != CL_SUCCESS ) {
     fprintf( stderr, "Unable to query the number of platforms: %s\n", CLErrString(status) );
     exit( 1 );
@@ -218,22 +218,23 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   fprintf( stdout, "Found %d platform(s).\n", numPlatforms );
 #endif
 
-  tmp_platforms = (cl_platform_id *) malloc( sizeof(cl_platform_id) * numPlatforms );
-  if ( ( status = clGetPlatformIDs( numPlatforms, tmp_platforms, NULL ) ) != CL_SUCCESS ) {
+  platforms_list = (cl_platform_id *) malloc( sizeof(cl_platform_id) * numPlatforms );
+  if ( ( status = clGetPlatformIDs( numPlatforms, platforms_list, NULL ) ) != CL_SUCCESS ) {
     fprintf( stderr, "Unable to enumerate the platforms: %s\n", CLErrString(status));
     exit( 1 );
   }
   
   if( !strcmp( device_type, "gpu" ) ) {
     fprintf( stderr, "\n GPU RANGE" );
-    platform = &tmp_platforms[1];
+    platform = &platforms_list[1];
     device_kind = CL_DEVICE_TYPE_GPU;
   }
   else { 
-    platform = &tmp_platforms[0];
+    platform = &platforms_list[0];
     device_kind = CL_DEVICE_TYPE_CPU;
   }
 
+  free(platforms_list);
 #ifdef __DEBUG
   PrintPlatform( (* platform) );
 #endif 
