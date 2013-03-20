@@ -11,10 +11,11 @@ Then just type this in your command line.
 	$ git clone https://github.com/LJMD-OpenCL/ljmd-opencl.git
 
 ###Install
-	cd ljmd-opencl
-	make
+	$ cd ljmd-opencl
+	$ make
 You will receive a executable called ljmd-CL in the same folder
 
 ###Test
 In order to test the correct execution of our software type.
-	make test
+
+	$ make test
