@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <math.h>
+
 #include "OpenCL_utils.h"
 
 #ifdef _USE_FLOAT
@@ -109,6 +110,10 @@ static void output(mdsys_t *sys, FILE *erg, FILE *traj)
     }
 }
 
+
+
+
+
 /* main */
 int main(int argc, char **argv) 
 {
@@ -117,7 +122,7 @@ int main(int argc, char **argv)
   cl_device_type device_type; /*to test if we are on cpu or gpu*/
   cl_context context;
   cl_command_queue cmdQueue;
-  
+
 #ifdef _UNBLOCK
   cl_uint  num_events = 3;
   cl_event event[num_events];
@@ -131,7 +136,6 @@ int main(int argc, char **argv)
   char restfile[BLEN], trajfile[BLEN], ergfile[BLEN], line[BLEN];
   FILE *fp,*traj,*erg;
   mdsys_t sys;
- 
   /* handling the command line arguments */
   switch (argc) {
       case 2: /* only the cpu/gpu argument was passed, setting default nthreads */
