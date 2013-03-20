@@ -21,14 +21,15 @@ ORI_EXE=ljmd-ori
 # required input and data files.
 INPUTS= argon_108.inp argon_2916.inp argon_78732.inp \
 	argon_108.rest argon_2916.rest argon_78732.rest
-REFERENCE_RESULTS=argon_108.dat argon_108.xyz argon_108_base.out
+REFERENCE_RESULTS=argon_108_base.dat argon_108_base.xyz
 
 #Instructions
 $(INPUTS):
 	ln -s $(INPUT_SRC)/$@ $@
 	
-$(REFERENCE_RESULTS): $(ORI_EXE)
-	./$(ORI_EXE) < argon_108.inp > argon_108_base.out
+$(REFERENCE_RESULTS): $(ORI_EXE) $(INPUTS)
+	./$(ORI_EXE) < argon_108.inp
+	mv argon_108.dat argon_108_base.dat; mv argon_108.xyz argon_108_base.xyz
 
 $(ORI_EXE): $(ORI_SRC_DIC)/ljmd-c1.c
 	$(CC) -o $(TEST_DIR)/$@ $< $(LIB)
@@ -39,8 +40,9 @@ run: $(EXE)
 	./$(EXE) cpu < argon_108.inp
 
 test: $(EXE) $(INPUTS) $(REFERENCE_RESULTS)
-	./$(EXE) cpu < argon_108.inp > argon_108_CL.out
-	diff argon_108_base.out argon_108_CL.out
+	./$(EXE) cpu < argon_108.inp
+	mv argon_108.dat argon_108_CL.dat; mv argon_108.xyz argon_108_CL.xyz
+	python src/tester.py
 
 clean:
 	rm -f $(TEST_DIR)/$(ORI_EXE)
