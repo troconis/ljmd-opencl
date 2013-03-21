@@ -123,6 +123,7 @@ int main(int argc, char **argv)
   cl_context context;
   cl_command_queue cmdQueue;
 
+  /* The event variables are created only when needed */
 #ifdef _UNBLOCK
   cl_uint  num_events = 3;
   cl_event event[num_events];
@@ -172,6 +173,7 @@ int main(int argc, char **argv)
     return 4;
   }
 
+  /* The event initialization is performed only when needed */
 #ifdef _UNBLOCK
   /* initialize the cl_event handler variables */
   for( i = 0; i < num_events; ++i) {
@@ -368,6 +370,7 @@ int main(int argc, char **argv)
       KArg(dtmf));
     CheckSuccess(status, 2);
 
+    /* When the data transfer is non blocking, this kernel has to wait the completion of part 8 (event[2]) */
 #ifdef _UNBLOCK
     status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event[2], NULL );
 #else
@@ -376,6 +379,8 @@ int main(int argc, char **argv)
 
     /* 6) download position@device to position@host */
     if ((sys.nfi % nprint) == nprint-1) {
+
+    /* In non blocking mode (CL_FALSE) this data transfer raises events[i] */
 #ifdef _UNBLOCK
 	status  = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, &event[2] );
 	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, &event[1] );
@@ -409,6 +414,8 @@ int main(int argc, char **argv)
 
     /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
     if ((sys.nfi % nprint) == nprint-1) {
+
+    /* In non blocking mode (CL_FALSE) this data transfer kernel raises an event[1] */
 #ifdef _UNBLOCK
 	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, &event[1] );
 #else
@@ -442,6 +449,7 @@ int main(int argc, char **argv)
 
 
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
+	/* In non blocking mode (CL_FALSE) this data transfer kernel raises an event[2] */
 #ifdef _UNBLOCK
 	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event[2] );
 #else
@@ -453,6 +461,8 @@ int main(int argc, char **argv)
     /* 1) write output every nprint steps */
     if ((sys.nfi % nprint) == 0) {
 
+    /* Calling a synchronization function (only when in non blocking mode) that will wait until all the
+     * events[i], related to the data transfers, to be completed */
 #ifdef _UNBLOCK
         clWaitForEvents(3, event);
 #endif
