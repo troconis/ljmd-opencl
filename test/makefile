@@ -52,6 +52,9 @@ $(ORI_EXE).opti: $(ORI_SRC_DIC)/ljmd-c1.c
 run: $(EXE) $(INPUTS)
 	./$(EXE) cpu < argon_108.inp
 
+optirun: $(EXE) $(INPUTS)
+	optirun ./$(EXE) gpu 1536 < argon_108.inp
+
 test: $(EXECUTABLES) $(INPUTS) $(REF_RESULTS)
 	for exe in $(EXECUTABLES); do \
 	   for file in $(INPUT_NAMES); do \
