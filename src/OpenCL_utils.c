@@ -185,11 +185,8 @@ bool PlatformHasDeviceType(cl_platform_id platform, cl_device_type device_type) 
 	int num_devices;
 	cl_int status;
 	// this call returns the number of devices of a given type
-	if ((status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices))!= CL_SUCCESS) {
-		fprintf(stderr, "Unable to query the number of devices of type %ld (%s)\n", device_type, CLErrString(status));
-		exit(1);
-	}
-	return (num_devices>0);
+	status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices);
+	return (status==CL_SUCCESS) && (num_devices>0);
 
 }
 
