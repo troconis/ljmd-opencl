@@ -1,0 +1,4 @@
+#!/bin/tcsh
+
+module load intel/2013 cuda/5.5 opencl-intel
+
