@@ -3,7 +3,7 @@
 #to be edited to compile the software for different
 #platforms
 
-CC=icc
+CC=gcc
 LIB=-lm
 
 
@@ -27,21 +27,24 @@ OBJECTS	=$(patsubst %,$(OBJ_DIR)/%,$(CODE_FILES:.c=.o))
 INCLUDES=$(patsubst %,$(INC_DIR)/%,$(HEADER_FILES))
 
 #Compilation Flags
-OPENCL_PATH=/opt/intel/opencl-1.2-3.0.56860
+OPENCL_PATH=/opt/AMDAPP/SDK
 OPENCL_LIBS=-L$(OPENCL_PATH)/lib64 -lOpenCL
 INCLUDE_PATH= -I$(INC_DIR) -I/usr/include/x86_64-linux-gnu/ -I$(OPENCL_PATH)/include -D__PROFILING
 OPENMP=-openmp
 OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 
 #Instructions
+debug: $(EXE).d
+
+
 $(EXE): $(OBJECTS)
 	$(CC) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
-$(EXE).opti: $(OBJECTS)
+$(EXE).d: $(OBJECTS)
 	$(CC) $(OPT) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
-	$(CC) $(INCLUDE_PATH) $< -o $@ -c
+	$(CC) $(OPT) $(INCLUDE_PATH) $< -o $@ -c
 
 $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 	awk '{print "\""$$0"\\n\""}' <$< >$@

@@ -255,7 +255,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
 
   free(platforms_list);
 #ifdef __DEBUG
-  PrintPlatform( (* platform) );
+  PrintPlatform( platform );
 #endif 
 
   /* Initialize the Devices */
@@ -265,7 +265,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
    }
 
 #ifdef __DEBUG
-  fprintf( stdout, "platform[%p]: Found a device.\n", (* platform) );
+  fprintf( stdout, "platform[%p]: Found a device.\n", platform );
 #endif
 
    //allocate memory for devices, contexts and command queues
