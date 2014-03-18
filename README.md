@@ -19,3 +19,11 @@ You will receive a executable called ljmd-CL in the same folder
 In order to test the correct execution of our software type.
 
 	$ make test
+
+###Command line parameters
+        ljmd-cl cpu|gpu[n] [nthread] <inpfile
+        n: optional number of gpus to be used
+        nthread: optional number of threads to be spawned
+        inpfile: simulation parameters input file
+        [a restart file (defined in inpfile) must be in
+         the corresponding path]

@@ -182,14 +182,11 @@ void PrintDeviceShort(cl_device_id device) {
 
 bool PlatformHasDeviceType(cl_platform_id platform, cl_device_type device_type) {
 	/* Initialize the Devices */
-	int num_devices;
+	cl_uint num_devices;
 	cl_int status;
 	// this call returns the number of devices of a given type
-	if ((status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices))!= CL_SUCCESS) {
-		fprintf(stderr, "Unable to query the number of devices of type %ld (%s)\n", device_type, CLErrString(status));
-		exit(1);
-	}
-	return (num_devices>0);
+	status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices);
+	return (status==CL_SUCCESS) && (num_devices>0);
 
 }
 
@@ -211,13 +208,14 @@ cl_platform_id FindPlatformWithDeviceType(cl_platform_id * platforms_list, int n
 
 }
 
-cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_context * context, cl_command_queue * cmdQueue ) {
+cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_context ** contexts, cl_command_queue ** cmdQueues , cl_uint * ngpu ) {
 
   cl_int status;
   cl_uint numPlatforms, numDevices;
   cl_device_type device_kind;
   cl_platform_id * platforms_list;
   cl_platform_id platform;
+  cl_uint u;
 
   /* Initialize the Platform. Program considers a single platform. */
   if ( ( status = clGetPlatformIDs( 0, NULL, &numPlatforms ) ) != CL_SUCCESS ) {
@@ -236,14 +234,21 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
     fprintf( stderr, "Unable to enumerate the platforms: %s\n", CLErrString(status));
     exit( 1 );
   }
+
+  *ngpu = 1;
   
-  if( !strcmp( device_type, "gpu" ) ) {
-    fprintf( stdout, "\nUSING GPU" );
+  if( !strncmp( device_type, "gpu", 3 ) ) {
+    if( strlen(device_type)==3 )
+      fprintf( stdout, "\nUSING GPU\n" );
+    else { //get optionally specified number of gpus
+      *ngpu = strtol(device_type+3, NULL, 10);
+      fprintf( stdout, "\nUSING %u GPUS\n", *ngpu );
+    }
     device_kind = CL_DEVICE_TYPE_GPU;
     platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
   }
   else { //cpu
-    fprintf( stdout, "\nUSING CPU" );
+    fprintf( stdout, "\nUSING CPU\n" );
     device_kind = CL_DEVICE_TYPE_CPU;
     platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
   }
@@ -263,23 +268,44 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_cont
   fprintf( stdout, "platform[%p]: Found a device.\n", (* platform) );
 #endif
 
-   if ((status = clGetDeviceIDs(  platform, device_kind, 1, device, NULL)) != CL_SUCCESS) {
+   //allocate memory for devices, contexts and command queues
+   if (!(*devices = (cl_device_id *) malloc(sizeof(cl_device_id)*(*ngpu)))) {
+     fprintf ( stderr, "unable to allocate memory for %u device ids\n", *ngpu);
+     exit( 1 );
+   }
+   if (!(*contexts = (cl_context *) malloc(sizeof(cl_context)*(*ngpu)))) {
+     fprintf ( stderr, "unable to allocate memory for %u contexts\n", *ngpu);
+     exit( 1 );
+   }
+   if (!(*cmdQueues = (cl_command_queue *) malloc(sizeof(cl_command_queue)*(*ngpu)))) {
+     fprintf ( stderr, "unable to allocate memory for %u command queues\n", *ngpu);
+     exit( 1 );
+   }
+
+   if ((status = clGetDeviceIDs(  platform, device_kind, *ngpu, *devices, NULL)) != CL_SUCCESS) {
      fprintf ( stderr, "platform[%p]: Unable to enumerate the devices: %s\n",  platform, CLErrString( status ) );
      exit( 1 );
    }
 
-   (* context) = clCreateContext( NULL, 1, device, NULL, NULL, &status );
+   //create 1 context per gpu (or cpu); supposed to be faster than having
+   //one context for everything
+   for(u=0;u<*ngpu;u++) {
+     (*contexts)[u] = clCreateContext( NULL, 1, (*devices)+u, NULL, NULL, &status );
   
-   if ( status != CL_SUCCESS ) {
-     fprintf ( stderr, "platform[%p]: Unable to init OpenCL context: %s\n", platform, CLErrString( status ) );
-     exit( 1 );     
+     if ( status != CL_SUCCESS ) {
+       fprintf ( stderr, "platform[%p]: Unable to init OpenCL context: %s\n", platform, CLErrString( status ) );
+       exit( 1 );     
+     }
    }
 
-   (* cmdQueue) = clCreateCommandQueue( (* context), (* device), 0, &status );
+   //create a command queue for each device
+   for(u=0;u<*ngpu;u++) {
+     (*cmdQueues)[u] = clCreateCommandQueue( (*contexts)[u], (*devices)[u], 0, &status );
   
-   if ( status != CL_SUCCESS ) {
-     fprintf ( stderr, "platform[%p]: Unable to init OpenCL command queue: %s\n", platform, CLErrString( status ) );
-     exit( 1 );
+     if ( status != CL_SUCCESS ) {
+       fprintf ( stderr, "platform[%p]: Unable to init OpenCL command queue: %s\n", platform, CLErrString( status ) );
+       exit( 1 );
+     }
    }
 
    return CL_SUCCESS;
