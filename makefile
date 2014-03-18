@@ -26,8 +26,9 @@ OBJECTS	=$(patsubst %,$(OBJ_DIR)/%,$(CODE_FILES:.c=.o))
 INCLUDES=$(patsubst %,$(INC_DIR)/%,$(HEADER_FILES))
 
 #Compilation Flags
-OPENCL_LIBS=-L/opt/intel/opencl-1.2-3.0.56860/lib64 -lOpenCL
-INCLUDE_PATH= -I$(INC_DIR) -I/usr/include/x86_64-linux-gnu/ -I/opt/intel/opencl-1.2-3.0.56860/include -D__PROFILING
+OPENCL_PATH=/opt/AMDAPP/SDK
+OPENCL_LIBS=-L$(OPENCL_PATH)/lib -lOpenCL
+INCLUDE_PATH= -I$(INC_DIR) -I/usr/include/x86_64-linux-gnu/ -I$(OPENCL_PATH/)include -D__PROFILING
 OPENMP=-openmp
 OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 
