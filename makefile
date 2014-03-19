@@ -2,7 +2,7 @@
 #This is the template file that serves as the file
 #to be edited to compile the software for different
 #platforms
-
+# kikidid
 CC=gcc
 LIB=-lm
 
