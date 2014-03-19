@@ -16,6 +16,12 @@ DARWIN = $(strip $(findstring DARWIN, $(OSUPPER)))
 CC=gcc
 LIB=-lm
 
+ifeq ($(CC),icc)
+      OPENMP = -openmp
+  else
+      OPENMP = -fopenmp
+endif
+
 
 #Directories
 SRC_DIR=src
@@ -36,19 +42,19 @@ HEADER_FILES	= OpenCL_utils.h OpenCL_data.h opencl_kernels_as_string.h
 OBJECTS	=$(patsubst %,$(OBJ_DIR)/%,$(CODE_FILES:.c=.o))
 INCLUDES=$(patsubst %,$(INC_DIR)/%,$(HEADER_FILES))
 
+OPENCL_PATH=/opt/AMDAPP/SDK
+
 # OS-specific build flags
 ifneq ($(DARWIN),) 
       OPENCL_LIBS= -framework OpenCL
       INCLUDE_PATH= -I$(INC_DIR) -I/Developer/NVIDIA/CUDA-5.5/include -D__PROFILING
-      OPENMP=-openmp
 else
   ifeq ($(OS_SIZE),32)
       CCFLAGS   := -m32
   else
-      OPENCL_LIBS=-L/opt/cuda/5.0/lib -lOpenCL
-      INCLUDE_PATH= -I$(INC_DIR) -I/usr/include/x86_64-linux-gnu/ -I/opt/cuda/5.0/include/ \
+      OPENCL_LIBS=-L$(OPENCL_PATH)/lib64 -lOpenCL
+      INCLUDE_PATH= -I$(INC_DIR) -I/usr/include/x86_64-linux-gnu/ -I$(OPENCL_PATH)/include \
       -D__PROFILING
-      OPENMP=-openmp
   endif
 endif
 
