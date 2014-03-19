@@ -1,3 +1,4 @@
+#! /bin/bash
 #This is the template file that serves as the file
 #to be edited to compile the software for different
 #platforms
@@ -62,14 +63,17 @@ endif
 OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 
 #Instructions
+debug: $(EXE).d
+
+
 $(EXE): $(OBJECTS)
 	$(CC) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
-$(EXE).opti: $(OBJECTS)
+$(EXE).d: $(OBJECTS)
 	$(CC) $(OPT) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
-	$(CC) $(INCLUDE_PATH) $< -o $@ -c
+	$(CC) $(OPT) $(INCLUDE_PATH) $< -o $@ -c
 
 $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 	awk '{print "\""$$0"\\n\""}' <$< >$@
