@@ -1,0 +1,60 @@
+#!/bin/bash
+
+EXE=ljmd-cl.d
+
+
+#This is to check if the executable exists
+if [ -s ../$EXE ]; then
+   echo -e "$EXE present... Running the benchmarks...\n"
+else
+   echo -e "Please run \"make $EXE\" before running this script...\n"
+   exit 3
+fi
+
+echo -e "\nThis script performs a series of simulations using the program $EXE.\n"
+echo -e "It is ASSUMED that the program $EXE is properly running."
+
+
+#copying the input and restart files into the benchmark directory
+#if the directory benchmarks does not exist, it is created
+
+for inpname in $(ls -1 ../examples/*.inp); do
+   ln -s $inpname ${inpname#../examples/}
+done
+
+for inpname in $(ls -1 ../examples/*.rest); do
+   ln -s $inpname ${inpname#../examples/}
+done
+
+LISTCPUTHREADS="2 4 8 16"
+LISTNUMATS="108 2916 78732"
+
+#LISTCPUTHREADS="8 16"
+#LISTNUMATS="108"
+
+echo "#CPU execution times:" > cputimes.log
+
+for j in $LISTNUMATS; do
+   for i in $LISTCPUTHREADS; do
+      ../$EXE cpu $i < argon_$j.inp > argon_$j.cpu$i.log
+      echo -e "$j atoms, $i threads in cpu: $(tail -n 2 argon_$j.cpu$i.log | head -n 1)"
+      echo -e "$j atoms, $i threads in cpu: $(tail -n 2 argon_$j.cpu$i.log | head -n 1)" >> cputimes.log
+   done 
+done
+
+LISTGPUTHREADS="32 128 512 1024 2048"
+#LISTNUMATS="108"
+#LISTGPUTHREADS="32 64"
+
+#The following part is not tested in argo/gpu01 server
+
+echo "#GPU execution times:" > gputimes.log
+for j in $LISTNUMATS; do
+   for i in $LISTGPUTHREADS; do
+      ../$EXE gpu $i < argon_$j.inp > argon_$j.gpu$i.log
+      echo -e "$j atoms, $i threads in gpu: $(tail -n 2 argon_$j.gpu$i.log | head -n 1)"
+      echo -e "$j atoms, $i threads in gpu: $(tail -n 2 argon_$j.gpu$i.log | head -n 1)" >> gputimes.log
+   done 
+done
+
+rm argon*.*
