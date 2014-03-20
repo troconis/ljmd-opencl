@@ -223,13 +223,15 @@ int main(int argc, char **argv)
   if(get_me_a_line(stdin,trajfile)) return 1;
   if(get_me_a_line(stdin,ergfile)) return 1;
   if(get_me_a_line(stdin,line)) return 1;
+  sys.crt=atof(line);
+  if(get_me_a_line(stdin,line)) return 1;
   sys.nsteps=atoi(line);
   if(get_me_a_line(stdin,line)) return 1;
   sys.dt=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
-  if(get_me_a_line(stdin,line)) return 1;
-  sys.crt=atof(line);
+
+
 
   /* allocate memory */
   for(u = 0; u < ndevices; u++) {
@@ -511,11 +513,11 @@ int main(int argc, char **argv)
         KArg(cl_sys[u].rx),
         KArg(cl_sys[u].ry),
         KArg(cl_sys[u].rz),
-      KArg(cl_sys[u].vx),  /*adding for Nose Hoover*/
-      KArg(cl_sys[u].vy),
-      KArg(cl_sys[u].vz),
-      KArg(sys.ksi),
-      KArg(sys.mass),
+        KArg(cl_sys[u].vx),  /*adding for Nose Hoover*/
+        KArg(cl_sys[u].vy),
+        KArg(cl_sys[u].vz),
+        KArg(sys.ksi),
+        KArg(sys.mass),
         KArg(cl_sys[u].natoms),
         KArg(epot_buffer[u]),
         KArg(c12),

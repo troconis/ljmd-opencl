@@ -9,7 +9,7 @@
 argon_108.rest    # restart
 argon_108.xyz     # trajectory
 argon_108.dat     # energies
-500000             # nr MD steps
-1.0               # MD time step (in fs)
-100              # output print frequency
-10               # Coefficient for Berendsen thermostat
+10                # Coefficient for Berendsen thermostat
+5000              # nr MD steps
+5.0               # MD time step (in fs)
+100               # output print frequency

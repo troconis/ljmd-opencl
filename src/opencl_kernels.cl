@@ -61,7 +61,6 @@ inline FPTYPE pbc(FPTYPE x, const FPTYPE boxby2, const FPTYPE box)
 
 
 __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz,  __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const FPTYPE ksi, const FPTYPE mass, const int natoms, __global FPTYPE * epot, const FPTYPE c12, const FPTYPE c6, const FPTYPE rcsq, const FPTYPE boxby2, const FPTYPE box, const int atom1, const int natoms1 ){
-
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
   int loc_id;

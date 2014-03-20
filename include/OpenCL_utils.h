@@ -3,7 +3,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#ifdef __APPLE__
+#include "OpenCL/opencl.h"
+#else
 #include "CL/cl.h"
+#endif
 #include <time.h>
 #include <sys/time.h>
 #include <ctype.h>
@@ -18,7 +22,7 @@ double second();
 
 #define STRINGSIZE 2048
 
-cl_int InitOpenCLEnvironment( char * device_type, cl_device_id * device, cl_context * context, cl_command_queue * cmdQueue );
+cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_context ** contexts, cl_command_queue ** cmdQueues , cl_uint * ngpu );
 
 char * source2string( char * filename );
 
