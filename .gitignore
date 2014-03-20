@@ -1,5 +1,13 @@
+
+*.dat
+*.inp~
+*.rest
+*.xyz
+
 # Object files
 *.o
+*.c~
+*.cl~
 
 # Libraries
 *.lib
@@ -15,3 +23,4 @@
 *.exe
 *.out
 *.app
+*.d
