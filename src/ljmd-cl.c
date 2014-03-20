@@ -43,7 +43,7 @@ const FPTYPE mvsq2e=2390.05736153349; /* m*v^2 in kcal/mol */
  * about the MD system */
 struct _mdsys {
     int natoms,nfi,nsteps,thermo;
-    FPTYPE dt, mass, epsilon, sigma, box, rcut;
+    FPTYPE dt, mass, epsilon, sigma, box, rcut,r0;
     FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     FPTYPE *rx, *ry, *rz;
     FPTYPE *vx, *vy, *vz;
@@ -55,7 +55,7 @@ typedef struct _mdsys mdsys_t;
  * about the MD system on a OpenCL device*/
 struct _cl_mdsys {
     int natoms,nfi,nsteps,thermo;
-    FPTYPE dt, mass, epsilon, sigma, box, rcut;
+    FPTYPE dt, mass, epsilon, sigma, box, rcut,r0;
     FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     cl_mem rx, ry, rz;
     cl_mem vx, vy, vz;
@@ -198,12 +198,6 @@ int main(int argc, char **argv)
 #endif
 
   /* read input file */
-  if(get_me_a_line(stdin,line)) return 1;   /*rflag for thermostat*/
-  sys.thermo=atoi(line);
-  if(sys.thermo>3){   
-        fprintf(stdout,"Error: Unknown thermostat.\n");
-        exit(1);
-        }
   if(get_me_a_line(stdin,line)) return 1;
   sys.natoms=atoi(line);
   if(get_me_a_line(stdin,line)) return 1;
@@ -223,14 +217,19 @@ int main(int argc, char **argv)
   if(get_me_a_line(stdin,trajfile)) return 1;
   if(get_me_a_line(stdin,ergfile)) return 1;
   if(get_me_a_line(stdin,line)) return 1;
-  sys.crt=atof(line);
-  if(get_me_a_line(stdin,line)) return 1;
   sys.nsteps=atoi(line);
   if(get_me_a_line(stdin,line)) return 1;
   sys.dt=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
-
+  if(get_me_a_line(stdin,line)) return 1;   /*thermo for thermostat*/
+  sys.thermo=atoi(line);
+  if(sys.thermo>3){   
+        fprintf(stdout,"Error: Unknown thermostat.\n");
+        exit(1);
+        }
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.crt=atof(line);
 
 
   /* allocate memory */
@@ -380,7 +379,7 @@ int main(int argc, char **argv)
           KArg(cl_sys[u].vz),
           KArg(sys.ksi),
           KArg(sys.mass), /*end adding velocity,ksi,mass for computing*/
-	  KArg(cl_sys[u].natoms),
+          KArg(cl_sys[u].natoms),
 	  KArg(epot_buffer[u]),
 	  KArg(c12),
 	  KArg(c6),

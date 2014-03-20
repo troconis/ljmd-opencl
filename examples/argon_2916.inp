@@ -1,4 +1,3 @@
-1                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
 2916              # natoms
 39.948            # mass in AMU
 0.2379            # epsilon in kcal/mol
@@ -9,7 +8,9 @@
 argon_2916.rest   # restart
 argon_2916.xyz    # trajectory
 argon_2916.dat    # energies
-10                # Coefficient for Berendsen thermostat
 5000              # nr MD steps
 5.0               # MD time step (in fs)
 100               # output print frequency
+1                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
+1                 # potential: 1 for LJ; 2 for Morse
+10                # Coefficient for Berendsen thermostat
