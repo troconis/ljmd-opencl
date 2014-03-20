@@ -32,7 +32,7 @@ __kernel void opencl_azzero(  __global FPTYPE * a, __global FPTYPE * b, __global
   }
 
 } 	 
-
+/** Calculate kinetic energy */
 __kernel void opencl_ekin(  __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const int natoms, __global FPTYPE * ekin ) {
 
   int nths = get_global_size( 0 );
@@ -51,7 +51,7 @@ __kernel void opencl_ekin(  __global FPTYPE * vx, __global FPTYPE * vy, __global
   //    sys->temp  = 2.0*sys->ekin/(3.0*sys->natoms-3.0)/kboltz;
 }
 
-
+/// Boundary conditions
 inline FPTYPE pbc(FPTYPE x, const FPTYPE boxby2, const FPTYPE box)
 {
     while (x >  boxby2) x -= box;
@@ -59,14 +59,14 @@ inline FPTYPE pbc(FPTYPE x, const FPTYPE boxby2, const FPTYPE box)
     return x;
 }
 
-
+/** Calculate the opencl force */
 __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz, const int natoms, __global FPTYPE * epot, const FPTYPE c12, const FPTYPE c6, const FPTYPE rcsq, const FPTYPE boxby2, const FPTYPE box, const int atom1, const int natoms1 ){
 
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
   int loc_id;
 
-  /* zero energy and forces */
+  /** zero energy and forces */
   epot[id_th] = ZERO;
 
   loc_id = id_th;
@@ -92,16 +92,16 @@ __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global
 
       FPTYPE loc_rx, loc_ry, loc_rz, rsq;
       
-      /* particles have no interactions with themselves */
+      /** particles have no interactions with themselves */
       if ( k == j) continue;
       
-      /* get distance between particle i and j */
+      /** get distance between particle i and j */
       loc_rx = pbc(rx1 - rx[j], boxby2, box);
       loc_ry = pbc(ry1 - ry[j], boxby2, box);
       loc_rz = pbc(rz1 - rz[j], boxby2, box);
       rsq = loc_rx * loc_rx + loc_ry * loc_ry + loc_rz * loc_rz;
       
-      /* compute force and energy if within cutoff */
+      /** compute force and energy if within cutoff */
       if (rsq < rcsq) {
   	FPTYPE r6, rinv, ffac;
 	
@@ -122,14 +122,14 @@ __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global
 
 }
 
-
+/** opencl verlet fisrt step*/
 __kernel void opencl_verlet_first( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz, __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const int natoms, const FPTYPE dt, const FPTYPE dtmf) {
 
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
   int loc_id = id_th;
 
-  /* first part: propagate velocities by half and positions by full step */
+  /** first part: propagate velocities by half and positions by full step */
   while( loc_id < natoms ){
   
     vx[loc_id] += dtmf * fx[loc_id];
@@ -144,13 +144,14 @@ __kernel void opencl_verlet_first( __global FPTYPE * fx, __global FPTYPE * fy, _
 }
 
 
+/** opencl verlet second step*/
 __kernel void opencl_verlet_second( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const int natoms, const FPTYPE dt, const FPTYPE dtmf) {
 
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
   int loc_id = id_th;
 
-  /* second part: propagate velocities by another half step */
+  /** second part: propagate velocities by another half step */
   while( loc_id < natoms ){
 
     vx[loc_id] += dtmf * fx[loc_id];
