@@ -1,13 +1,6 @@
-
-*.dat
-*.inp~
-*.rest
-*.xyz
-
 # Object files
 *.o
-*.c~
-*.cl~
+*.*~
 
 # Libraries
 *.lib
@@ -15,12 +8,18 @@
 
 # Shared objects (inc. Windows DLLs)
 *.dll
-*.so
-*.so.*
+*.so*
 *.dylib
 
 # Executables
 *.exe
 *.out
 *.app
-*.d
+ljmd*
+
+# data files
+*.inp
+*.rest
+*.dat*
+*.xyz*
+.DS_Store

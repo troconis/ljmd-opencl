@@ -63,13 +63,11 @@ endif
 OPT= -O3 $(OPENMP) -Wall -D__DEBUG -D_USE_FLOAT
 
 #Instructions
-debug: $(EXE).d
-
 
 $(EXE): $(OBJECTS)
-	$(CC) $^ -o $@ $(OPENCL_LIBS) $(LIB)
+	$(CC) $(OPT) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
-$(EXE).d: $(OBJECTS)
+$(EXE).opti: $(OBJECTS)
 	$(CC) $(OPT) $^ -o $@ $(OPENCL_LIBS) $(LIB)
 
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
@@ -78,6 +76,7 @@ $(OBJ_DIR)/%.o:$(SRC_DIR)/%.c $(INCLUDES)
 $(INC_DIR)/opencl_kernels_as_string.h: $(SRC_DIR)/opencl_kernels.cl
 	awk '{print "\""$$0"\\n\""}' <$< >$@
 
+debug: $(EXE).d
 
 ## Calls
 run: $(EXE)
