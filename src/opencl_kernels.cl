@@ -60,8 +60,7 @@ inline FPTYPE pbc(FPTYPE x, const FPTYPE boxby2, const FPTYPE box)
 }
 
 /** Calculate the opencl force */
-__kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz, const int natoms, __global FPTYPE * epot, const FPTYPE c12, const FPTYPE c6, const FPTYPE rcsq, const FPTYPE boxby2, const FPTYPE box, const int atom1, const int natoms1 ){
-
+__kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz,  __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const FPTYPE ksi, const FPTYPE mass, const int natoms, __global FPTYPE * epot, const FPTYPE c12, const FPTYPE c6, const FPTYPE rcsq, const FPTYPE boxby2, const FPTYPE box, const int atom1, const int natoms1 ){
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
   int loc_id;
@@ -111,9 +110,14 @@ __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global
   	ffac = ( TWELVE * c12 * r6 - SIX * c6 ) * r6 * rinv;
   	epot[id_th] += HALF * r6 * ( c12 * r6 - c6 );
 	
-  	fx[loc_id] += loc_rx * ffac;
+/*  	fx[loc_id] += loc_rx * ffac;
   	fy[loc_id] += loc_ry * ffac;
-  	fz[loc_id] += loc_rz * ffac;
+  	fz[loc_id] += loc_rz * ffac;*/
+	/*calculate forces incorporating thermostat*/
+  	fx[loc_id] += loc_rx * ffac  -  ksi*mass*vx[loc_id]; 
+  	fy[loc_id] += loc_ry * ffac  -  ksi*mass*vy[loc_id];
+  	fz[loc_id] += loc_rz * ffac  -  ksi*mass*vz[loc_id];
+
       }
     }
 
@@ -123,7 +127,7 @@ __kernel void opencl_force( __global FPTYPE * fx, __global FPTYPE * fy, __global
 }
 
 /** opencl verlet fisrt step*/
-__kernel void opencl_verlet_first( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz, __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const int natoms, const FPTYPE dt, const FPTYPE dtmf) {
+__kernel void opencl_verlet_first( __global FPTYPE * fx, __global FPTYPE * fy, __global FPTYPE * fz, __global FPTYPE * rx, __global FPTYPE * ry, __global FPTYPE * rz, __global FPTYPE * vx, __global FPTYPE * vy, __global FPTYPE * vz, const FPTYPE lambda, const int natoms, const FPTYPE dt, const FPTYPE dtmf) {
 
   int nths = get_global_size( 0 );
   int id_th = get_global_id( 0 );
@@ -135,6 +139,9 @@ __kernel void opencl_verlet_first( __global FPTYPE * fx, __global FPTYPE * fy, _
     vx[loc_id] += dtmf * fx[loc_id];
     vy[loc_id] += dtmf * fy[loc_id];
     vz[loc_id] += dtmf * fz[loc_id];
+    vx[loc_id] *= lambda;
+    vy[loc_id] *= lambda;
+    vz[loc_id] *= lambda;
     rx[loc_id] += dt*vx[loc_id];
     ry[loc_id] += dt*vy[loc_id];
     rz[loc_id] += dt*vz[loc_id];

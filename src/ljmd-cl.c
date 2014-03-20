@@ -51,6 +51,7 @@
 #define HALF  0.5f
 #define TWO   2.0f
 #define THREE 3.0f
+#define qmass 2000000.0f
 static const char kernelflags[] = "-D_USE_FLOAT -cl-denorms-are-zero -cl-unsafe-math-optimizations";
 #else
 #define FPTYPE double
@@ -58,6 +59,7 @@ static const char kernelflags[] = "-D_USE_FLOAT -cl-denorms-are-zero -cl-unsafe-
 #define HALF  0.5
 #define TWO   2.0
 #define THREE 3.0
+#define qmass 2000000.0
 static const char kernelflags[] = "-cl-unsafe-math-optimizations";
 #endif
 
@@ -71,9 +73,9 @@ const FPTYPE mvsq2e=2390.05736153349; /* m*v^2 in kcal/mol */
 /** structure to hold the complete information
     about the MD system */
 struct _mdsys {
-    int natoms,nfi,nsteps;
-    FPTYPE dt, mass, epsilon, sigma, box, rcut;
-    FPTYPE ekin, epot, temp;
+    int natoms,nfi,nsteps,thermo;
+    FPTYPE dt, mass, epsilon, sigma, box, rcut,r0;
+    FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     FPTYPE *rx, *ry, *rz;
     FPTYPE *vx, *vy, *vz;
     FPTYPE *fx, *fy, *fz;
@@ -83,9 +85,9 @@ typedef struct _mdsys mdsys_t;
 /** structure to hold the complete information
     about the MD system on a OpenCL device*/
 struct _cl_mdsys {
-    int natoms,nfi,nsteps;
-    FPTYPE dt, mass, epsilon, sigma, box, rcut;
-    FPTYPE ekin, epot, temp;
+    int natoms,nfi,nsteps,thermo;
+    FPTYPE dt, mass, epsilon, sigma, box, rcut,r0;
+    FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     cl_mem rx, ry, rz;
     cl_mem vx, vy, vz;
     cl_mem fx, fy, fz;
@@ -248,6 +250,17 @@ int main(int argc, char **argv)
   sys.dt=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
+/*read desired temperature for thermostat*/
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.temp0=atof(line);
+  if(get_me_a_line(stdin,line)) return 1;   /*thermo for thermostat*/
+  sys.thermo=atoi(line);
+  if(sys.thermo>3){   
+        fprintf(stdout,"Error: Unknown thermostat.\n");
+        exit(1);
+        }
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.crt=atof(line);
 
 
   /** allocate memory */
@@ -302,6 +315,8 @@ int main(int argc, char **argv)
   }
 
   /** initialize forces and energies.*/
+  sys.ksi=0.0;  /*coefficient for Hoover Nose thermostat*/
+  sys.lambda=1.0; /*coefficient for Velocity Rescaling thermostat*/
   sys.nfi=0;
 
   size_t globalWorkSize[1];
@@ -383,14 +398,19 @@ int main(int argc, char **argv)
 
     status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_azzero[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-    status |= clSetMultKernelArgs( kernel_force[u], 0, 15,
+    status |= clSetMultKernelArgs( kernel_force[u], 0, 20,
 	  KArg(cl_sys[u].fx),
 	  KArg(cl_sys[u].fy),
 	  KArg(cl_sys[u].fz),
 	  KArg(cl_sys[u].rx),
 	  KArg(cl_sys[u].ry),
 	  KArg(cl_sys[u].rz),
-	  KArg(cl_sys[u].natoms),
+          KArg(cl_sys[u].vx),/*adding velocity,ksi,mass for computing*/
+          KArg(cl_sys[u].vy),
+          KArg(cl_sys[u].vz),
+          KArg(sys.ksi),
+          KArg(sys.mass), /*end adding velocity,ksi,mass for computing*/
+          KArg(cl_sys[u].natoms),
 	  KArg(epot_buffer[u]),
 	  KArg(c12),
 	  KArg(c6),
@@ -474,7 +494,7 @@ int main(int argc, char **argv)
     /** propagate system and recompute energies */
     /** 2) verlet_first   */
     for( u = 0; u < ndevices; u++ ) {
-      status |= clSetMultKernelArgs( kernel_verlet_first[u], 0, 12,
+      status |= clSetMultKernelArgs( kernel_verlet_first[u], 0, 13,
         KArg(cl_sys[u].fx),
         KArg(cl_sys[u].fy),
         KArg(cl_sys[u].fz),
@@ -484,6 +504,7 @@ int main(int argc, char **argv)
         KArg(cl_sys[u].vx),
         KArg(cl_sys[u].vy),
         KArg(cl_sys[u].vz),
+        KArg(sys.lambda),
         KArg(cl_sys[u].natoms),
         KArg(sys.dt),
         KArg(dtmf));
@@ -515,13 +536,18 @@ int main(int argc, char **argv)
 
     /** 3) force */
     for( u = 0; u < ndevices; u++) {
-      status |= clSetMultKernelArgs( kernel_force[u], 0, 15,
+      status |= clSetMultKernelArgs( kernel_force[u], 0, 20,
         KArg(cl_sys[u].fx),
         KArg(cl_sys[u].fy),
         KArg(cl_sys[u].fz),
         KArg(cl_sys[u].rx),
         KArg(cl_sys[u].ry),
         KArg(cl_sys[u].rz),
+        KArg(cl_sys[u].vx),  /*adding for Nose Hoover*/
+        KArg(cl_sys[u].vy),
+        KArg(cl_sys[u].vz),
+        KArg(sys.ksi),
+        KArg(sys.mass),
         KArg(cl_sys[u].natoms),
         KArg(epot_buffer[u]),
         KArg(c12),
@@ -556,7 +582,7 @@ int main(int argc, char **argv)
 
 
     /** 7) download E_pot[i]@device and perform reduction to E_pot@host */
-    if ((sys.nfi % nprint) == nprint-1) {
+   /* if ((sys.nfi % nprint) == nprint-1) {*/
 
     /** In non blocking mode (CL_FALSE) this data transfer kernel raises an event[1] */
     for( u = 0; u < ndevices; u++) {
@@ -567,7 +593,7 @@ int main(int argc, char **argv)
 #endif
 	    CheckSuccess(status, 7);
 	  }
-    }
+   /* }*/
 
     /** 4) verlet_second */
     for( u = 0; u < ndevices; u++) {
@@ -586,7 +612,7 @@ int main(int argc, char **argv)
       status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_verlet_second[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
     }
 
-    if ((sys.nfi % nprint) == nprint-1) {
+   /* if ((sys.nfi % nprint) == nprint-1) {*/
 
 	/** 5) ekin */
 	status |= clSetMultKernelArgs( kernel_ekin[0], 0, 5, KArg(cl_sys[0].vx), KArg(cl_sys[0].vy), KArg(cl_sys[0].vz),
@@ -603,10 +629,10 @@ int main(int argc, char **argv)
 	status |= clEnqueueReadBuffer( cmdQueues[0], ekin_buffer[0], CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin[0], 0, NULL, NULL );
 #endif
 	CheckSuccess(status, 8);
-    }
+    /*}*/
 
     /** 1) write output every nprint steps */
-    if ((sys.nfi % nprint) == 0) {
+/*    if ((sys.nfi % nprint) == 0) {*/
 
     /** Calling a synchronization function (only when in non blocking mode) that will wait until all the
      * events[i], related to the data transfers, to be completed */
@@ -634,6 +660,19 @@ int main(int argc, char **argv)
 	sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
 
 	/** writing output files (positions, energies and temperature) */
+        if (sys.thermo==1){
+        sys.ksi  +=  -kboltz/qmass*((3.0*sys.natoms+1)*sys.temp0-3.0*sys.natoms*sys.temp)*sys.dt;
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nKsi for Nose Hoover = %.3g (seconds)\n", sys.ksi );*/ 
+}
+        else if (sys.thermo==2){
+        sys.lambda=sqrt(sys.temp0/sys.temp);        
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Velocity Rescaling = %.3g (seconds)\n",sys.lambda);*/  
+}
+        else if (sys.thermo==3){
+        sys.lambda=sqrt(1+sys.dt/sys.crt*(sys.temp0/sys.temp-1));
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Berendsen = %.3g (seconds)\n",sys.lambda);*/  
+        } /*sys.crt is the rise time of Berendsen thermostat*/
+if ((sys.nfi % nprint) == 0) {
 	output(&sys, erg, traj);
     }
 
