@@ -15,3 +15,11 @@
 *.exe
 *.out
 *.app
+ljmd*
+
+# data files
+*.inp
+*.rest
+*.dat*
+*.xyz*
+.DS_Store
