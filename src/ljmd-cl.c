@@ -210,9 +210,6 @@ int main(int argc, char **argv)
   sys.rcut=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   sys.box=atof(line);
-/*read desired temperature for thermostat*/
-  if(get_me_a_line(stdin,line)) return 1;
-  sys.temp0=atof(line);
   if(get_me_a_line(stdin,restfile)) return 1;
   if(get_me_a_line(stdin,trajfile)) return 1;
   if(get_me_a_line(stdin,ergfile)) return 1;
@@ -222,6 +219,9 @@ int main(int argc, char **argv)
   sys.dt=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
+/*read desired temperature for thermostat*/
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.temp0=atof(line);
   if(get_me_a_line(stdin,line)) return 1;   /*thermo for thermostat*/
   sys.thermo=atoi(line);
   if(sys.thermo>3){   

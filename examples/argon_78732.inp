@@ -4,13 +4,12 @@
 3.405             # sigma in angstrom
 8.5               # rcut in angstrom
 154.522           # box length (in angstrom)
-50		  # temperature
 argon_78732.rest  # restart
 argon_78732.xyz   # trajectory
 argon_78732.dat   # energies
 5000              # nr MD steps
 5.0               # MD time step (in fs)
 100               # output print frequency
+50		  # temperature
 1                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
-1                 # potential: 1 for LJ; 2 for Morse
 10                # Coefficient for Berendsen thermostat
