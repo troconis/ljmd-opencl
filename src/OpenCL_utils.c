@@ -2,21 +2,22 @@
 
 #include <stdarg.h>
 
+/**
+  CLErrString --
+ 
+       Utility function that converts an OpenCL status into a human
+       readable string.
+ 
+  Results:
+       const char * pointer to a static string.
+*/
+
 #include <string.h>
 #include <stdbool.h>
 
 
 #define Warning(...)    fprintf(stderr, __VA_ARGS__)
 
-/*
- * CLErrString --
- *
- *      Utility function that converts an OpenCL status into a human
- *      readable string.
- *
- * Results:
- *      const char * pointer to a static string.
- */
 
 
 
@@ -85,7 +86,7 @@ void PrintPlatform(cl_platform_id platform) {
   
 }
 
-// prints a short one line platform summary
+/// prints a short one line platform summary
 void PrintPlatformShort(cl_platform_id platform) {
 
    static struct { cl_platform_info param; const char *name;  char value[255];} props[] = {
@@ -181,16 +182,16 @@ void PrintDeviceShort(cl_device_id device) {
 }
 
 bool PlatformHasDeviceType(cl_platform_id platform, cl_device_type device_type) {
-	/* Initialize the Devices */
+	/** Initialize the Devices */
 	cl_uint num_devices;
 	cl_int status;
-	// this call returns the number of devices of a given type
+	/// this call returns the number of devices of a given type
 	status = clGetDeviceIDs(platform, device_type, 0, NULL, &num_devices);
 	return (status==CL_SUCCESS) && (num_devices>0);
 
 }
 
-// takes a platforms_list and returns the device that is a given device_type
+/// takes a platforms_list and returns the device that is a given device_type
 cl_platform_id FindPlatformWithDeviceType(cl_platform_id * platforms_list, int num_platforms, cl_device_type device_type) {
 	int i;
 	cl_int status;
@@ -202,7 +203,7 @@ cl_platform_id FindPlatformWithDeviceType(cl_platform_id * platforms_list, int n
 	   if( PlatformHasDeviceType(platforms_list[i], device_type) )
 		   return platforms_list[i];
 	}
-	// if we get to here it is an error (no platform has the requested device)
+	/// if we get to here it is an error (no platform has the requested device)
     fprintf( stderr, "Unable to find the platform with the device type: %ld\n", device_type);
     exit( 1 );
 
@@ -217,7 +218,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
   cl_platform_id platform;
   cl_uint u;
 
-  /* Initialize the Platform. Program considers a single platform. */
+  /** Initialize the Platform. Program considers a single platform. */
   if ( ( status = clGetPlatformIDs( 0, NULL, &numPlatforms ) ) != CL_SUCCESS ) {
     fprintf( stderr, "Unable to query the number of platforms: %s\n", CLErrString(status) );
     exit( 1 );
@@ -240,14 +241,14 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
   if( !strncmp( device_type, "gpu", 3 ) ) {
     if( strlen(device_type)==3 )
       fprintf( stdout, "\nUSING GPU\n" );
-    else { //get optionally specified number of gpus
+    else { ///get optionally specified number of gpus
       *ngpu = strtol(device_type+3, NULL, 10);
       fprintf( stdout, "\nUSING %u GPUS\n", *ngpu );
     }
     device_kind = CL_DEVICE_TYPE_GPU;
     platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
   }
-  else { //cpu
+  else { ///cpu
     fprintf( stdout, "\nUSING CPU\n" );
     device_kind = CL_DEVICE_TYPE_CPU;
     platform = FindPlatformWithDeviceType(platforms_list, numPlatforms, device_kind);
@@ -258,7 +259,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
   PrintPlatform( platform );
 #endif 
 
-  /* Initialize the Devices */
+  /** Initialize the Devices */
   if ((status = clGetDeviceIDs( platform , device_kind, 0, NULL, &numDevices ) ) != CL_SUCCESS) {
     fprintf( stderr, "platform[%p]: Unable to query the number of devices: %s\n", platform, CLErrString( status ) );
     exit( 1 );
@@ -268,7 +269,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
   fprintf( stdout, "platform[%p]: Found a device.\n", platform );
 #endif
 
-   //allocate memory for devices, contexts and command queues
+   ///allocate memory for devices, contexts and command queues
    if (!(*devices = (cl_device_id *) malloc(sizeof(cl_device_id)*(*ngpu)))) {
      fprintf ( stderr, "unable to allocate memory for %u device ids\n", *ngpu);
      exit( 1 );
@@ -287,8 +288,8 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
      exit( 1 );
    }
 
-   //create 1 context per gpu (or cpu); supposed to be faster than having
-   //one context for everything
+   ///create 1 context per gpu (or cpu); supposed to be faster than having
+   ///one context for everything
    for(u=0;u<*ngpu;u++) {
      (*contexts)[u] = clCreateContext( NULL, 1, (*devices)+u, NULL, NULL, &status );
   
@@ -298,7 +299,7 @@ cl_int InitOpenCLEnvironment( char * device_type, cl_device_id ** devices, cl_co
      }
    }
 
-   //create a command queue for each device
+   ///create a command queue for each device
    for(u=0;u<*ngpu;u++) {
      (*cmdQueues)[u] = clCreateCommandQueue( (*contexts)[u], (*devices)[u], 0, &status );
   
@@ -356,7 +357,7 @@ char * source2string( char * filename ){
 }
 
 
-/* commodity function for a row of clSetKernelArg calls
+/** commodity function for a row of clSetKernelArg calls
    arguments: kernel,
               first_index: index to start from,
               nargs: number of clSetKernelArg calls (with linearly increasing index,
@@ -390,11 +391,11 @@ void CheckSuccess (cl_int status, const int part) {
 	}
 }
 
-/* This section contains the timing function */
+/** This section contains the timing function */
 
 double second()
 
-/* Returns elepsed seconds past from the last call to timer rest */
+/** Returns elepsed seconds past from the last call to timer rest */
 {
 
     struct timeval tmp;

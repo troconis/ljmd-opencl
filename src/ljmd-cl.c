@@ -1,9 +1,17 @@
-/*
- * simple lennard-jones potential MD code with velocity verlet.
- * units: Length=Angstrom, Mass=amu; Energy=kcal
- *
- * OpenCL parallel baseline version.
- * optimization 1: apply serial improvements except newtons 3rd law
+/** \mainpage Simple lennard-jones potential MD code with velocity verlet.
+ 
+  OpenCL parallel baseline version.
+  optimization 1: apply serial improvements except newtons 3rd law\n
+  units: Length=Angstrom, Mass=amu; Energy=kcal
+
+  \date Mar / 20  / 2014
+  \author Ajasja Ljubetic
+  \author Johannes Voss
+  \author Moses Sokunbi
+  \author Ivan Girotto
+  \author Oscar Najera
+  \author Rodrigo Neumann
+
  */
 
 #include <stdio.h>
@@ -30,15 +38,15 @@ static const char kernelflags[] = "-D_USE_FLOAT -cl-denorms-are-zero -cl-unsafe-
 static const char kernelflags[] = "-cl-unsafe-math-optimizations";
 #endif
 
-/* generic file- or pathname buffer length */
+/** generic file- or pathname buffer length */
 #define BLEN 200
 
-/* a few physical constants */
+/** a few physical constants */
 const FPTYPE kboltz=0.0019872067;     /* boltzman constant in kcal/mol/K */
 const FPTYPE mvsq2e=2390.05736153349; /* m*v^2 in kcal/mol */
 
-/* structure to hold the complete information
- * about the MD system */
+/** structure to hold the complete information
+    about the MD system */
 struct _mdsys {
     int natoms,nfi,nsteps;
     FPTYPE dt, mass, epsilon, sigma, box, rcut;
@@ -49,8 +57,8 @@ struct _mdsys {
 };
 typedef struct _mdsys mdsys_t;
 
-/* structure to hold the complete information
- * about the MD system on a OpenCL device*/
+/** structure to hold the complete information
+    about the MD system on a OpenCL device*/
 struct _cl_mdsys {
     int natoms,nfi,nsteps;
     FPTYPE dt, mass, epsilon, sigma, box, rcut;
@@ -61,13 +69,13 @@ struct _cl_mdsys {
 };
 typedef struct _cl_mdsys cl_mdsys_t;
 
-/* helper function: read a line and then return
+/** helper function: read a line and then return
    the first string with whitespace stripped off */
 static int get_me_a_line(FILE *fp, char *buf)
 {
     char tmp[BLEN], *ptr;
 
-    /* read a line and cut of comments and blanks */
+    /** read a line and cut of comments and blanks */
     if (fgets(tmp,BLEN,fp)) {
         int i;
 
@@ -97,7 +105,7 @@ void PrintUsageAndExit() {
     exit(1);
 }
 
-/* append data to output. */
+/** append data to output. */
 static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 {
     int i;
@@ -114,16 +122,16 @@ static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 
 
 
-/* main */
+/** main */
 int main(int argc, char **argv)
 {
-  /*OpenCL variables */
+  /** OpenCL variables */
   cl_device_id *devices=NULL;
   cl_device_type device_type; /*to test if we are on cpu or gpu*/
   cl_context *contexts=NULL;
   cl_command_queue *cmdQueues=NULL;
 
-  /* The event variables are created only when needed */
+  /** The event variables are created only when needed */
 #ifdef _UNBLOCK
   cl_event *event;
 #endif
@@ -142,7 +150,7 @@ int main(int argc, char **argv)
   cl_uint u, nforce, *firstatoms, *natoms;
 
 
-/* Start profiling */
+/** Start profiling */
 
 #ifdef __PROFILING
 
@@ -152,13 +160,13 @@ int main(int argc, char **argv)
 
 #endif
 
-  /* handling the command line arguments */
+  /** handling the command line arguments */
   switch (argc) {
-      case 2: /* only the cpu/gpu argument was passed, setting default nthreads */
+      case 2: /** only the cpu/gpu argument was passed, setting default nthreads */
 	      if( !strcmp( argv[1], "cpu" ) ) nthreads = 16;
 	      else nthreads = 1024;
 	      break;
-      case 3: /* both the device type (cpu/gpu) and the number of threads were passed */
+      case 3: /** both the device type (cpu/gpu) and the number of threads were passed */
 	      nthreads = strtol(argv[2],NULL,10);
 	      if( nthreads<0 ) {
 		      fprintf( stderr, "\n. The number of threads must be more than 1.\n");

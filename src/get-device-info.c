@@ -1,7 +1,4 @@
-/*
- * This prints the number of devices with the type and the number of hardware threads
- *
- */
+/** This prints the number of devices with the type and the number of hardware threads */
 
 
 #include <stdio.h>
