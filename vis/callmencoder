@@ -1,1 +1,0 @@
-mencoder mf://*.jpg -mf w=600:h=400:fps=6:type=jpg -ovc lavc -lavcopts vcodec=mpeg4:mbd=2:trell -oac copy -o output.avi  >/dev/null 2>&1
