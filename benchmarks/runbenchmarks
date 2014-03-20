@@ -1,10 +1,10 @@
 #!/bin/bash
 
-EXE=ljmd-cl
+EXE=ljmd-cl.d
 
 
 #This is to check if the executable exists
-if [ -s $EXE ]; then
+if [ -s ../$EXE ]; then
    echo -e "$EXE present... Running the benchmarks...\n"
 else
    echo -e "Please run \"make $EXE\" before running this script...\n"
@@ -18,10 +18,13 @@ echo -e "It is ASSUMED that the program $EXE is properly running."
 #copying the input and restart files into the benchmark directory
 #if the directory benchmarks does not exist, it is created
 
-mkdir -p benchmarks
-cd benchmarks
-cp ../examples/*.inp .
-cp ../examples/*.rest .
+for inpname in $(ls -1 ../examples/*.inp); do
+   ln -s $inpname ${inpname#../examples/}
+done
+
+for inpname in $(ls -1 ../examples/*.rest); do
+   ln -s $inpname ${inpname#../examples/}
+done
 
 LISTCPUTHREADS="2 4 8 16"
 LISTNUMATS="108 2916 78732"
