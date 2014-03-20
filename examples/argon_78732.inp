@@ -1,12 +1,15 @@
+1                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
 78732             # natoms
 39.948            # mass in AMU
 0.2379            # epsilon in kcal/mol
 3.405             # sigma in angstrom
-12.0              # rcut in angstrom
+8.5               # rcut in angstrom
 154.522           # box length (in angstrom)
+50		  # temperature
 argon_78732.rest  # restart
 argon_78732.xyz   # trajectory
 argon_78732.dat   # energies
-20                # nr MD steps
+10                # Coefficient for Berendsen thermostat
+5000              # nr MD steps
 5.0               # MD time step (in fs)
-5                 # output print frequency
+100               # output print frequency
