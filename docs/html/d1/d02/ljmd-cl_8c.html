@@ -258,7 +258,41 @@ Variables</h2></td></tr>
 <p>Start profiling</p>
 <p>handling the command line arguments</p>
 <p>only the cpu/gpu argument was passed, setting default nthreads</p>
-<p>both the device type (cpu/gpu) and the number of threads were passed </p>
+<p>both the device type (cpu/gpu) and the number of threads were passed</p>
+<p>Initialize the OpenCL environment</p>
+<p>The event initialization is performed only when needed</p>
+<p>read input file</p>
+<p>allocate memory</p>
+<p>positions and velocities</p>
+<p>read restart</p>
+<p>initialize forces and energies.</p>
+<p>precompute some constants</p>
+<p>determine how many force vectors to calculate per gpu</p>
+<p>last gpu gets a few more atoms if it doesn't match</p>
+<p>Azzero force buffer</p>
+<p>download data on host</p>
+<p>download force fragments and distribute them among gpus</p>
+<p>main MD loop</p>
+<p>propagate system and recompute energies</p>
+<p>2) verlet_first</p>
+<p>When the data transfer is non blocking, this kernel has to wait the completion of part 8 (event[2])</p>
+<p>6) download position to position</p>
+<p>In non blocking mode (CL_FALSE) this data transfer raises events[i]</p>
+<p>3) force</p>
+<p>download force fragments and distribute them among gpus</p>
+<p>7) download E_pot[i] and perform reduction to E_pot</p>
+<p>In non blocking mode (CL_FALSE) this data transfer kernel raises an event[1]</p>
+<p>4) verlet_second</p>
+<p>5) ekin</p>
+<p>8) download E_kin[i] and perform reduction to E_kin</p>
+<p>In non blocking mode (CL_FALSE) this data transfer kernel raises an event[2]</p>
+<p>1) write output every nprint steps</p>
+<p>Calling a synchronization function (only when in non blocking mode) that will wait until all the events[i], related to the data transfers, to be completed</p>
+<p>initialize the sys.epot and sys.ekin variables to ZERO</p>
+<p>reduction on the tmp_Exxx[i] buffers downloaded from the device during parts 7 and 8 of the previous MD loop iteration</p>
+<p>multiplying the kinetic energy by prefactors</p>
+<p>writing output files (positions, energies and temperature)</p>
+<p>clean up: close files, free memory </p>
 
 </div>
 </div>
@@ -324,7 +358,7 @@ Variables</h2></td></tr>
 
 
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Mar 20 2014 16:16:20 for LJMD-OpenCL by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Thu Mar 20 2014 18:37:00 for LJMD-OpenCL by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="../../doxygen.png" alt="doxygen"/>
 </a> 1.7.6.1
 </small></address>
