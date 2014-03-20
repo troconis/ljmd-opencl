@@ -1,4 +1,4 @@
-/* 
+/*
  * simple lennard-jones potential MD code with velocity verlet.
  * units: Length=Angstrom, Mass=amu; Energy=kcal
  *
@@ -20,6 +20,7 @@
 #define HALF  0.5f
 #define TWO   2.0f
 #define THREE 3.0f
+#define qmass 2000000.0f
 static const char kernelflags[] = "-D_USE_FLOAT -cl-denorms-are-zero -cl-unsafe-math-optimizations";
 #else
 #define FPTYPE double
@@ -27,6 +28,7 @@ static const char kernelflags[] = "-D_USE_FLOAT -cl-denorms-are-zero -cl-unsafe-
 #define HALF  0.5
 #define TWO   2.0
 #define THREE 3.0
+#define qmass 2000000.0
 static const char kernelflags[] = "-cl-unsafe-math-optimizations";
 #endif
 
@@ -37,24 +39,24 @@ static const char kernelflags[] = "-cl-unsafe-math-optimizations";
 const FPTYPE kboltz=0.0019872067;     /* boltzman constant in kcal/mol/K */
 const FPTYPE mvsq2e=2390.05736153349; /* m*v^2 in kcal/mol */
 
-/* structure to hold the complete information 
+/* structure to hold the complete information
  * about the MD system */
 struct _mdsys {
-    int natoms,nfi,nsteps;
+    int natoms,nfi,nsteps,thermo;
     FPTYPE dt, mass, epsilon, sigma, box, rcut;
-    FPTYPE ekin, epot, temp;
+    FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     FPTYPE *rx, *ry, *rz;
     FPTYPE *vx, *vy, *vz;
     FPTYPE *fx, *fy, *fz;
 };
 typedef struct _mdsys mdsys_t;
 
-/* structure to hold the complete information 
+/* structure to hold the complete information
  * about the MD system on a OpenCL device*/
 struct _cl_mdsys {
-    int natoms,nfi,nsteps;
+    int natoms,nfi,nsteps,thermo;
     FPTYPE dt, mass, epsilon, sigma, box, rcut;
-    FPTYPE ekin, epot, temp;
+    FPTYPE ekin, epot, temp, temp0, ksi,lambda,crt;
     cl_mem rx, ry, rz;
     cl_mem vx, vy, vz;
     cl_mem fx, fy, fz;
@@ -89,7 +91,7 @@ static int get_me_a_line(FILE *fp, char *buf)
     }
     return 0;
 }
- 
+
 void PrintUsageAndExit() {
     fprintf( stderr, "\nError. Run the program as follow: ");
     fprintf( stderr, "\n./ljmd-cl.x device [thread-number] < input ");
@@ -101,7 +103,7 @@ void PrintUsageAndExit() {
 static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 {
     int i;
-    
+
     printf("% 8d % 20.8f % 20.8f % 20.8f % 20.8f\n", sys->nfi, sys->temp, sys->ekin, sys->epot, sys->ekin+sys->epot);
     fprintf(erg,"% 8d % 20.8f % 20.8f % 20.8f % 20.8f\n", sys->nfi, sys->temp, sys->ekin, sys->epot, sys->ekin+sys->epot);
     fprintf(traj,"%d\n nfi=%d etot=%20.8f\n", sys->natoms, sys->nfi, sys->ekin+sys->epot);
@@ -115,34 +117,37 @@ static void output(mdsys_t *sys, FILE *erg, FILE *traj)
 
 
 /* main */
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
   /*OpenCL variables */
-  cl_device_id device;
+  cl_device_id *devices=NULL;
   cl_device_type device_type; /*to test if we are on cpu or gpu*/
-  cl_context context;
-  cl_command_queue cmdQueue;
+  cl_context *contexts=NULL;
+  cl_command_queue *cmdQueues=NULL;
 
   /* The event variables are created only when needed */
 #ifdef _UNBLOCK
-  cl_uint  num_events = 3;
-  cl_event event[num_events];
+  cl_event *event;
 #endif
 
-  FPTYPE * buffers[3];
-  cl_mdsys_t cl_sys;
+  cl_event *force_event;
+
+  FPTYPE * buffers[6];
+  cl_mdsys_t *cl_sys;
   cl_int status;
+  cl_uint ndevices;
 
   int nprint, i, nthreads = 0;
   char restfile[BLEN], trajfile[BLEN], ergfile[BLEN], line[BLEN];
   FILE *fp,*traj,*erg;
   mdsys_t sys;
+  cl_uint u, nforce, *firstatoms, *natoms;
 
 
 /* Start profiling */
 
 #ifdef __PROFILING
-  
+
   double t1, t2;
 
   t1 = second();
@@ -166,23 +171,39 @@ int main(int argc, char **argv)
 	      PrintUsageAndExit();
 	      break;
   }
-  
+
   /* Initialize the OpenCL environment */
-  if( InitOpenCLEnvironment( argv[1], &device, &context, &cmdQueue ) != CL_SUCCESS ){
+  if( InitOpenCLEnvironment( argv[1], &devices, &contexts, &cmdQueues, &ndevices ) != CL_SUCCESS ){
     fprintf( stderr, "Program Error! OpenCL Environment was not initialized correctly.\n" );
     return 4;
   }
 
   /* The event initialization is performed only when needed */
+  if(!(cl_sys = (cl_mdsys_t *) malloc(sizeof(cl_mdsys_t)*ndevices))) {
+    fprintf( stderr, "Cannot allocate memory of cl_sys copies.\n");
+    return 5;
+  }
+
 #ifdef _UNBLOCK
   /* initialize the cl_event handler variables */
-  for( i = 0; i < num_events; ++i) {
-	  event[i] = clCreateUserEvent( context, NULL );
+  event = (cl_event *) alloca(sizeof(cl_event)*(ndevices+2));
+  for( i = 0; i < 3; ++i) {
+	  event[i] = clCreateUserEvent( contexts[0], NULL );
+	  clSetUserEventStatus( event[i], CL_COMPLETE );
+  }
+  for( i = 3; i < ndevices+2; ++i) {
+	  event[i] = clCreateUserEvent( contexts[i-2], NULL );
 	  clSetUserEventStatus( event[i], CL_COMPLETE );
   }
 #endif
 
   /* read input file */
+  if(get_me_a_line(stdin,line)) return 1;   /*rflag for thermostat*/
+  sys.thermo=atoi(line);
+  if(sys.thermo>3){   
+        fprintf(stdout,"Error: Unknown thermostat.\n");
+        exit(1);
+        }
   if(get_me_a_line(stdin,line)) return 1;
   sys.natoms=atoi(line);
   if(get_me_a_line(stdin,line)) return 1;
@@ -195,6 +216,9 @@ int main(int argc, char **argv)
   sys.rcut=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   sys.box=atof(line);
+/*read desired temperature for thermostat*/
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.temp0=atof(line);
   if(get_me_a_line(stdin,restfile)) return 1;
   if(get_me_a_line(stdin,trajfile)) return 1;
   if(get_me_a_line(stdin,ergfile)) return 1;
@@ -204,131 +228,187 @@ int main(int argc, char **argv)
   sys.dt=atof(line);
   if(get_me_a_line(stdin,line)) return 1;
   nprint=atoi(line);
-  
+  if(get_me_a_line(stdin,line)) return 1;
+  sys.crt=atof(line);
 
-  
   /* allocate memory */
-  cl_sys.natoms = sys.natoms;
-  cl_sys.rx = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.ry = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.rz = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.vx = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.vy = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.vz = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.fx = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.fy = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  cl_sys.fz = clCreateBuffer( context, CL_MEM_READ_WRITE, cl_sys.natoms * sizeof(FPTYPE), NULL, &status );
-  
-  buffers[0] = (FPTYPE *) malloc( 2 * cl_sys.natoms * sizeof(FPTYPE) );
-  buffers[1] = (FPTYPE *) malloc( 2 * cl_sys.natoms * sizeof(FPTYPE) );
-  buffers[2] = (FPTYPE *) malloc( 2 * cl_sys.natoms * sizeof(FPTYPE) );
-  
+  for(u = 0; u < ndevices; u++) {
+    cl_sys[u].natoms = sys.natoms;
+    cl_sys[u].rx = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].ry = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].rz = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].vx = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].vy = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].vz = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].fx = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE|CL_MEM_ALLOC_HOST_PTR, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].fy = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE|CL_MEM_ALLOC_HOST_PTR, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+    cl_sys[u].fz = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE|CL_MEM_ALLOC_HOST_PTR, cl_sys[u].natoms * sizeof(FPTYPE), NULL, &status );
+  }
+
+  //positions and velocities
+  buffers[0] = (FPTYPE *) malloc( 2 * cl_sys[0].natoms * sizeof(FPTYPE) );
+  buffers[1] = (FPTYPE *) malloc( 2 * cl_sys[0].natoms * sizeof(FPTYPE) );
+  buffers[2] = (FPTYPE *) malloc( 2 * cl_sys[0].natoms * sizeof(FPTYPE) );
+  //forces
+  buffers[3] = (FPTYPE *) malloc( cl_sys[0].natoms * sizeof(FPTYPE) );
+  buffers[4] = (FPTYPE *) malloc( cl_sys[0].natoms * sizeof(FPTYPE) );
+  buffers[5] = (FPTYPE *) malloc( cl_sys[0].natoms * sizeof(FPTYPE) );
+
   /* read restart */
   fp = fopen( restfile, "r" );
   if( fp ) {
-    for( i = 0; i < 2 * cl_sys.natoms; ++i ){
+    for( i = 0; i < 2 * cl_sys[0].natoms; ++i ){
 #ifdef _USE_FLOAT
       fscanf( fp, "%f%f%f", buffers[0] + i, buffers[1] + i, buffers[2] + i);
 #else
       fscanf( fp, "%lf%lf%lf", buffers[0] + i, buffers[1] + i, buffers[2] + i);
 #endif
     }
-    
-    status = clEnqueueWriteBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
-    
-    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0] + cl_sys.natoms, 0, NULL, NULL ); 
-    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vy, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1] + cl_sys.natoms, 0, NULL, NULL ); 
-    status |= clEnqueueWriteBuffer( cmdQueue, cl_sys.vz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2] + cl_sys.natoms, 0, NULL, NULL ); 
-    
+
+    for( u = 0; u < ndevices; u++ ) {
+      status = clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].rx, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+      status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].ry, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+      status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].rz, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
+
+      status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].vx, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[0] + cl_sys[u].natoms, 0, NULL, NULL );
+      status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].vy, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[1] + cl_sys[u].natoms, 0, NULL, NULL );
+      status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].vz, CL_TRUE, 0, cl_sys[u].natoms * sizeof(FPTYPE), buffers[2] + cl_sys[u].natoms, 0, NULL, NULL );
+    }
+
     fclose(fp);
 
   } else {
     perror("cannot read restart file");
     return 3;
   }
-  
+
   /* initialize forces and energies.*/
+  sys.ksi=0.0;  /*coefficient for Hoover Nose thermostat*/
+  sys.lambda=1.0; /*coefficient for Velocity Rescaling thermostat*/
   sys.nfi=0;
-  
+
   size_t globalWorkSize[1];
   globalWorkSize[0] = nthreads;
-  
+
   const char * sourcecode =
   #include <opencl_kernels_as_string.h>
   ;
 
-  cl_program program = clCreateProgramWithSource( context, 1, (const char **) &sourcecode, NULL, &status );
-  
-  status |= clBuildProgram( program, 0, NULL, kernelflags, NULL, NULL );
-  
+  cl_program *program = (cl_program *) alloca(sizeof(cl_program)*ndevices);
+  cl_kernel *kernel_force = (cl_kernel *) alloca(sizeof(cl_kernel)*ndevices);
+  cl_kernel *kernel_ekin = (cl_kernel *) alloca(sizeof(cl_kernel)*ndevices);
+  cl_kernel *kernel_verlet_first = (cl_kernel *) alloca(sizeof(cl_kernel)*ndevices);
+  cl_kernel *kernel_verlet_second = (cl_kernel *) alloca(sizeof(cl_kernel)*ndevices);
+  cl_kernel *kernel_azzero = (cl_kernel *) alloca(sizeof(cl_kernel)*ndevices);
+
+  for(u = 0; u < ndevices; u++) {
+    program[u] = clCreateProgramWithSource( contexts[u], 1, (const char **) &sourcecode, NULL, &status );
+
+    status |= clBuildProgram( program[u], 0, NULL, kernelflags, NULL, NULL );
+
 #ifdef __DEBUG
   size_t log_size;
-  char log [200000]; 
-  clGetProgramBuildInfo( program, device, CL_PROGRAM_BUILD_LOG, sizeof(log), log, &log_size );
-  fprintf( stderr, "\nLog: \n\n %s", log ); 
+  char log [200000];
+  clGetProgramBuildInfo( program[u], devices[u], CL_PROGRAM_BUILD_LOG, sizeof(log), log, &log_size );
+  fprintf( stderr, "\nLog: \n\n %s", log );
 #endif
-  
-  cl_kernel kernel_force = clCreateKernel( program, "opencl_force", &status );
-  cl_kernel kernel_ekin = clCreateKernel( program, "opencl_ekin", &status );
-  cl_kernel kernel_verlet_first = clCreateKernel( program, "opencl_verlet_first", &status );
-  cl_kernel kernel_verlet_second = clCreateKernel( program, "opencl_verlet_second", &status );
-  cl_kernel kernel_azzero = clCreateKernel( program, "opencl_azzero", &status );
-  
-  FPTYPE * tmp_epot;
-  cl_mem epot_buffer;
-  tmp_epot = (FPTYPE *) malloc( nthreads * sizeof(FPTYPE) );
-  epot_buffer = clCreateBuffer( context, CL_MEM_READ_WRITE, nthreads * sizeof(FPTYPE), NULL, &status );
-  
+
+    kernel_force[u] = clCreateKernel( program[u], "opencl_force", &status );
+    kernel_ekin[u] = clCreateKernel( program[u], "opencl_ekin", &status );
+    kernel_verlet_first[u] = clCreateKernel( program[u], "opencl_verlet_first", &status );
+    kernel_verlet_second[u] = clCreateKernel( program[u], "opencl_verlet_second", &status );
+    kernel_azzero[u] = clCreateKernel( program[u], "opencl_azzero", &status );
+
+  }
+
+  FPTYPE ** tmp_epot;
+  cl_mem *epot_buffer = (cl_mem *) alloca(sizeof(epot_buffer)*ndevices);
+  tmp_epot = (FPTYPE **) malloc( sizeof(void *) * ndevices );
+  for( u = 0; u < ndevices; u++)
+    tmp_epot[u] = (FPTYPE *) malloc( nthreads * sizeof(FPTYPE) );
+  for(u = 0; u < ndevices; u++)
+    epot_buffer[u] = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, nthreads * sizeof(FPTYPE), NULL, &status );
+
+
   /* precompute some constants */
   FPTYPE c12 = 4.0 * sys.epsilon * pow( sys.sigma, 12.0);
   FPTYPE c6  = 4.0 * sys.epsilon * pow( sys.sigma, 6.0);
   FPTYPE rcsq = sys.rcut * sys.rcut;
-  FPTYPE boxby2 = HALF * sys.box;  
+  FPTYPE boxby2 = HALF * sys.box;
   FPTYPE dtmf = HALF * sys.dt / mvsq2e / sys.mass;
   sys.epot = ZERO;
   sys.ekin = ZERO;
 
+  FPTYPE ** tmp_ekin;
+  cl_mem *ekin_buffer = (cl_mem *) alloca(sizeof(cl_mem)*ndevices);
+  tmp_ekin = (FPTYPE **) malloc( sizeof(void *) * ndevices );
+  for( u = 0; u < ndevices; u++)
+    tmp_ekin[u] = (FPTYPE *) malloc( nthreads * sizeof(FPTYPE) );
+
+  //determine how many force vectors to calculate per gpu
+  nforce = sys.natoms / ndevices;
+
+  firstatoms = (cl_uint *) alloca(sizeof(cl_uint) * ndevices);
+  natoms = (cl_uint *) alloca(sizeof(cl_uint) * ndevices);
+
+  for( u = 0; u < ndevices-1 ; u++) {
+    firstatoms[u] = u * nforce;
+    natoms[u] = nforce;
+  }
+  //last gpu gets a few more atoms if it doesn't match
+  firstatoms[ndevices-1] = (ndevices-1)*nforce;
+  natoms[ndevices-1] = sys.natoms - firstatoms[ndevices-1];
+
+  for( u = 0; u < ndevices; u++) {
   /* Azzero force buffer */
-  status = clSetMultKernelArgs( kernel_azzero, 0, 4, KArg(cl_sys.fx), KArg(cl_sys.fy), KArg(cl_sys.fz), KArg(cl_sys.natoms));
+    status = clSetMultKernelArgs( kernel_azzero[u], 0, 4, KArg(cl_sys[u].fx), KArg(cl_sys[u].fy), KArg(cl_sys[u].fz), KArg(cl_sys[u].natoms));
 
-  status = clEnqueueNDRangeKernel( cmdQueue, kernel_azzero, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-  status |= clSetMultKernelArgs( kernel_force, 0, 13,
-	KArg(cl_sys.fx),
-	KArg(cl_sys.fy),
-	KArg(cl_sys.fz),
-	KArg(cl_sys.rx),
-	KArg(cl_sys.ry),
-	KArg(cl_sys.rz),
-	KArg(cl_sys.natoms),
-	KArg(epot_buffer),
-	KArg(c12),
-	KArg(c6),
-	KArg(rcsq),
-	KArg(boxby2),
-	KArg(sys.box));
-  
-  status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
-  
-  status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );     
-  
-  for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[i];
-  
-  FPTYPE * tmp_ekin;
-  cl_mem ekin_buffer;
-  tmp_ekin = (FPTYPE *) malloc( nthreads * sizeof(FPTYPE) );
-  ekin_buffer = clCreateBuffer( context, CL_MEM_READ_WRITE, nthreads * sizeof(FPTYPE), NULL, &status );
-  
-  status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
-    KArg(cl_sys.natoms), KArg(ekin_buffer));
-  
-  status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
-    
-  status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );     
+    status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_azzero[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
-  for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[i];
+    status |= clSetMultKernelArgs( kernel_force[u], 0, 20,
+	  KArg(cl_sys[u].fx),
+	  KArg(cl_sys[u].fy),
+	  KArg(cl_sys[u].fz),
+	  KArg(cl_sys[u].rx),
+	  KArg(cl_sys[u].ry),
+	  KArg(cl_sys[u].rz),
+          KArg(cl_sys[u].vx),/*adding velocity,ksi,mass for computing*/
+          KArg(cl_sys[u].vy),
+          KArg(cl_sys[u].vz),
+          KArg(sys.ksi),
+          KArg(sys.mass), /*end adding velocity,ksi,mass for computing*/
+	  KArg(cl_sys[u].natoms),
+	  KArg(epot_buffer[u]),
+	  KArg(c12),
+	  KArg(c6),
+	  KArg(rcsq),
+	  KArg(boxby2),
+	  KArg(sys.box),
+	  KArg(firstatoms[u]),
+	  KArg(natoms[u]));
+
+
+    status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_force[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+
+    status |= clEnqueueReadBuffer( cmdQueues[u], epot_buffer[u], CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot[u], 0, NULL, NULL );
+  }
+
+  for( u = 0; u < ndevices; u++ )
+    for( i = 0; i < nthreads; i++) sys.epot += tmp_epot[u][i];
+
+  for( u = 0; u < ndevices; u++ ) {
+    ekin_buffer[u] = clCreateBuffer( contexts[u], CL_MEM_READ_WRITE, nthreads * sizeof(FPTYPE), NULL, &status );
+
+    status |= clSetMultKernelArgs( kernel_ekin[u], 0, 5, KArg(cl_sys[u].vx), KArg(cl_sys[u].vy), KArg(cl_sys[u].vz),
+      KArg(cl_sys[u].natoms), KArg(ekin_buffer[u]));
+
+    status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_ekin[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+  }
+
+  status |= clEnqueueReadBuffer( cmdQueues[0], ekin_buffer[0], CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin[0], 0, NULL, NULL );
+
+  for( i = 0; i < nthreads; i++) sys.ekin += tmp_ekin[0][i];
   sys.ekin *= HALF * mvsq2e * sys.mass;
   sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
 
@@ -337,17 +417,43 @@ int main(int argc, char **argv)
 
   printf("Starting simulation with %d atoms for %d steps.\n",sys.natoms, sys.nsteps);
   printf("     NFI            TEMP            EKIN                 EPOT              ETOT\n");
-  
+
   /* download data on host */
-  status = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL ); 
-  status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL ); 
-  status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL ); 
-  
+  status = clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rx, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+  status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].ry, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+  status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rz, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
+
   sys.rx = buffers[0];
   sys.ry = buffers[1];
   sys.rz = buffers[2];
-  
+
   output(&sys, erg, traj);
+
+  if( ndevices > 1 ) {
+    force_event = (cl_event *) alloca(sizeof(cl_event)*ndevices);
+    for( u = 0; u < ndevices; u++ ) {
+	  force_event[u] = clCreateUserEvent( contexts[u], NULL );
+	  clSetUserEventStatus( force_event[u], CL_COMPLETE );
+    }
+
+
+    // download force fragments and distribute them among gpus
+    for( u = 0 ; u < ndevices; u++ ) {
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fx, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[3] + firstatoms[u], 0, NULL, NULL );
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fy, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[4] + firstatoms[u], 0, NULL, NULL );
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fz, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[5] + firstatoms[u], 0, force_event+u, NULL );
+    }
+
+    clWaitForEvents(ndevices, force_event);
+
+    for( u = 0 ; u < ndevices; u++ ) {
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fx, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[3], 0, NULL, NULL );
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fy, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[4], 0, NULL, NULL );
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fz, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[5], 0, force_event+u, NULL );
+    }
+
+    clWaitForEvents(ndevices, force_event);
+  }
 
   /**************************************************/
   /* main MD loop */
@@ -355,116 +461,151 @@ int main(int argc, char **argv)
 
     /* propagate system and recompute energies */
     /* 2) verlet_first   */
-    status |= clSetMultKernelArgs( kernel_verlet_first, 0, 12,
-      KArg(cl_sys.fx),
-      KArg(cl_sys.fy),
-      KArg(cl_sys.fz),
-      KArg(cl_sys.rx),
-      KArg(cl_sys.ry),
-      KArg(cl_sys.rz),
-      KArg(cl_sys.vx),
-      KArg(cl_sys.vy),
-      KArg(cl_sys.vz),
-      KArg(cl_sys.natoms),
-      KArg(sys.dt),
-      KArg(dtmf));
-    CheckSuccess(status, 2);
+    for( u = 0; u < ndevices; u++ ) {
+      status |= clSetMultKernelArgs( kernel_verlet_first[u], 0, 13,
+        KArg(cl_sys[u].fx),
+        KArg(cl_sys[u].fy),
+        KArg(cl_sys[u].fz),
+        KArg(cl_sys[u].rx),
+        KArg(cl_sys[u].ry),
+        KArg(cl_sys[u].rz),
+        KArg(cl_sys[u].vx),
+        KArg(cl_sys[u].vy),
+        KArg(cl_sys[u].vz),
+        KArg(sys.lambda),
+        KArg(cl_sys[u].natoms),
+        KArg(sys.dt),
+        KArg(dtmf));
+      CheckSuccess(status, 2);
 
     /* When the data transfer is non blocking, this kernel has to wait the completion of part 8 (event[2]) */
 #ifdef _UNBLOCK
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 1, &event[2], NULL );
+      status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_verlet_first[u], 1, NULL, globalWorkSize, NULL, 1, &event[1], NULL );
 #else
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_first, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+      status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_verlet_first[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 #endif
+    }
 
     /* 6) download position@device to position@host */
     if ((sys.nfi % nprint) == nprint-1) {
 
     /* In non blocking mode (CL_FALSE) this data transfer raises events[i] */
 #ifdef _UNBLOCK
-	status  = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, &event[2] );
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, &event[1] );
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_FALSE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, &event[0] );
+	status  = clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rx, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].ry, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rz, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[2], 0, NULL, &event[0] );
 #else
-	status  = clEnqueueReadBuffer( cmdQueue, cl_sys.rx, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.ry, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
-	status |= clEnqueueReadBuffer( cmdQueue, cl_sys.rz, CL_TRUE, 0, cl_sys.natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
+	status  = clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rx, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[0], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].ry, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[1], 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueues[0], cl_sys[0].rz, CL_TRUE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[2], 0, NULL, NULL );
 #endif
 	CheckSuccess(status, 6);
     }
 
     /* 3) force */
-    status |= clSetMultKernelArgs( kernel_force, 0, 13,
-      KArg(cl_sys.fx),
-      KArg(cl_sys.fy),
-      KArg(cl_sys.fz),
-      KArg(cl_sys.rx),
-      KArg(cl_sys.ry),
-      KArg(cl_sys.rz),
-      KArg(cl_sys.natoms),
-      KArg(epot_buffer),
-      KArg(c12),
-      KArg(c6),
-      KArg(rcsq),
-      KArg(boxby2),
-      KArg(sys.box));
+    for( u = 0; u < ndevices; u++) {
+      status |= clSetMultKernelArgs( kernel_force[u], 0, 20,
+        KArg(cl_sys[u].fx),
+        KArg(cl_sys[u].fy),
+        KArg(cl_sys[u].fz),
+        KArg(cl_sys[u].rx),
+        KArg(cl_sys[u].ry),
+        KArg(cl_sys[u].rz),
+      KArg(cl_sys[u].vx),  /*adding for Nose Hoover*/
+      KArg(cl_sys[u].vy),
+      KArg(cl_sys[u].vz),
+      KArg(sys.ksi),
+      KArg(sys.mass),
+        KArg(cl_sys[u].natoms),
+        KArg(epot_buffer[u]),
+        KArg(c12),
+        KArg(c6),
+        KArg(rcsq),
+        KArg(boxby2),
+        KArg(sys.box),
+        KArg(firstatoms[u]),
+        KArg(natoms[u]));
 
-    CheckSuccess(status, 3);
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_force, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+      CheckSuccess(status, 3);
+      status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_force[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+    }
+    // download force fragments and distribute them among gpus
+    if( ndevices > 1 ) {
+      for( u = 0 ; u < ndevices; u++ ) {
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fx, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[3] + firstatoms[u], 0, NULL, NULL );
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fy, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[4] + firstatoms[u], 0, NULL, NULL );
+        status |= clEnqueueReadBuffer( cmdQueues[u], cl_sys[u].fz, CL_FALSE, 0, natoms[u] * sizeof(FPTYPE), buffers[5] + firstatoms[u], 0, force_event+u, NULL );
+      }
 
-    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
-    if ((sys.nfi % nprint) == nprint-1) {
+      clWaitForEvents(ndevices, force_event);
 
-    /* In non blocking mode (CL_FALSE) this data transfer kernel raises an event[1] */
-#ifdef _UNBLOCK
-	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, &event[1] );
-#else
-	status |= clEnqueueReadBuffer( cmdQueue, epot_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot, 0, NULL, NULL );
-#endif
-	CheckSuccess(status, 7);
+      for( u = 0 ; u < ndevices; u++ ) {
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fx, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[3], 0, NULL, NULL );
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fy, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[4], 0, NULL, NULL );
+        status |= clEnqueueWriteBuffer( cmdQueues[u], cl_sys[u].fz, CL_FALSE, 0, cl_sys[0].natoms * sizeof(FPTYPE), buffers[5], 0, force_event+u, NULL );
+      }
+
+      clWaitForEvents(ndevices, force_event);
     }
 
+
+    /* 7) download E_pot[i]@device and perform reduction to E_pot@host */
+   /* if ((sys.nfi % nprint) == nprint-1) {*/
+
+    /* In non blocking mode (CL_FALSE) this data transfer kernel raises an event[1] */
+    for( u = 0; u < ndevices; u++) {
+#ifdef _UNBLOCK
+	    status |= clEnqueueReadBuffer( cmdQueues[u], epot_buffer[u], CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_epot[u], 0, NULL, &event[u+2] );
+#else
+	    status |= clEnqueueReadBuffer( cmdQueues[u], epot_buffer[u], CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_epot[u], 0, NULL, NULL );
+#endif
+	    CheckSuccess(status, 7);
+	  }
+   /* }*/
+
     /* 4) verlet_second */
-    status |= clSetMultKernelArgs( kernel_verlet_second, 0, 9,
-      KArg(cl_sys.fx),
-      KArg(cl_sys.fy),
-      KArg(cl_sys.fz),
-      KArg(cl_sys.vx),
-      KArg(cl_sys.vy),
-      KArg(cl_sys.vz),
-      KArg(cl_sys.natoms),
-      KArg(sys.dt),
-      KArg(dtmf));
+    for( u = 0; u < ndevices; u++) {
+      status |= clSetMultKernelArgs( kernel_verlet_second[u], 0, 9,
+        KArg(cl_sys[u].fx),
+        KArg(cl_sys[u].fy),
+        KArg(cl_sys[u].fz),
+        KArg(cl_sys[u].vx),
+        KArg(cl_sys[u].vy),
+        KArg(cl_sys[u].vz),
+        KArg(cl_sys[u].natoms),
+        KArg(sys.dt),
+        KArg(dtmf));
 
-    CheckSuccess(status, 4);
-    status = clEnqueueNDRangeKernel( cmdQueue, kernel_verlet_second, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+      CheckSuccess(status, 4);
+      status = clEnqueueNDRangeKernel( cmdQueues[u], kernel_verlet_second[u], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+    }
 
-    if ((sys.nfi % nprint) == nprint-1) {
+   /* if ((sys.nfi % nprint) == nprint-1) {*/
 
 	/* 5) ekin */
-	status |= clSetMultKernelArgs( kernel_ekin, 0, 5, KArg(cl_sys.vx), KArg(cl_sys.vy), KArg(cl_sys.vz),
-			KArg(cl_sys.natoms), KArg(ekin_buffer));
+	status |= clSetMultKernelArgs( kernel_ekin[0], 0, 5, KArg(cl_sys[0].vx), KArg(cl_sys[0].vy), KArg(cl_sys[0].vz),
+			KArg(cl_sys[0].natoms), KArg(ekin_buffer[0]));
 	CheckSuccess(status, 5);
-	status = clEnqueueNDRangeKernel( cmdQueue, kernel_ekin, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
+	status = clEnqueueNDRangeKernel( cmdQueues[0], kernel_ekin[0], 1, NULL, globalWorkSize, NULL, 0, NULL, NULL );
 
 
 	/* 8) download E_kin[i]@device and perform reduction to E_kin@host */
 	/* In non blocking mode (CL_FALSE) this data transfer kernel raises an event[2] */
 #ifdef _UNBLOCK
-	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, &event[2] );
+	status |= clEnqueueReadBuffer( cmdQueues[0], ekin_buffer[0], CL_FALSE, 0, nthreads * sizeof(FPTYPE), tmp_ekin[0], 0, NULL, &event[2] );
 #else
-	status |= clEnqueueReadBuffer( cmdQueue, ekin_buffer, CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin, 0, NULL, NULL );
+	status |= clEnqueueReadBuffer( cmdQueues[0], ekin_buffer[0], CL_TRUE, 0, nthreads * sizeof(FPTYPE), tmp_ekin[0], 0, NULL, NULL );
 #endif
 	CheckSuccess(status, 8);
-    }
+    /*}*/
 
     /* 1) write output every nprint steps */
-    if ((sys.nfi % nprint) == 0) {
+/*    if ((sys.nfi % nprint) == 0) {*/
 
     /* Calling a synchronization function (only when in non blocking mode) that will wait until all the
      * events[i], related to the data transfers, to be completed */
 #ifdef _UNBLOCK
-        clWaitForEvents(3, event);
+        clWaitForEvents(ndevices+2, event);
 #endif
 	sys.rx = buffers[0];
 	sys.ry = buffers[1];
@@ -476,16 +617,30 @@ int main(int argc, char **argv)
 
 	/* reduction on the tmp_Exxx[i] buffers downloaded from the device
 	 * during parts 7 and 8 of the previous MD loop iteration */
-	for( i = 0; i < nthreads; i++) {
-		sys.epot += tmp_epot[i];
-		sys.ekin += tmp_ekin[i];
-	}
+	for( u = 0; u < ndevices; u++)
+	    for( i = 0; i < nthreads; i++)
+		  sys.epot += tmp_epot[u][i];
+	for( i = 0; i < nthreads; i++)
+		sys.ekin += tmp_ekin[0][i];
 
 	/* multiplying the kinetic energy by prefactors */
 	sys.ekin *= HALF * mvsq2e * sys.mass;
 	sys.temp  = TWO * sys.ekin / ( THREE * sys.natoms - THREE ) / kboltz;
 
+        if (sys.thermo==1){
+        sys.ksi  +=  -kboltz/qmass*((3.0*sys.natoms+1)*sys.temp0-3.0*sys.natoms*sys.temp)*sys.dt;
+if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nKsi for Nose Hoover = %.3g (seconds)\n", sys.ksi );
+}
+        else if (sys.thermo==2){
+        sys.lambda=sqrt(sys.temp0/sys.temp);        
+if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Velocity Rescaling = %.3g (seconds)\n",sys.lambda);
+}
+        else if (sys.thermo==3){
+        sys.lambda=sqrt(1+sys.dt/sys.crt*(sys.temp0/sys.temp-1));
+if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Berendsen = %.3g (seconds)\n",sys.lambda);
+        } /*sys.crt is the rise time of Berendsen thermostat*/
 	/* writing output files (positions, energies and temperature) */
+if ((sys.nfi % nprint) == 0) {
 	output(&sys, erg, traj);
     }
 
@@ -515,6 +670,12 @@ fprintf( stdout, "\n\nTime of execution = %.3g (seconds)\n", (t2 - t1) );
   free(buffers[0]);
   free(buffers[1]);
   free(buffers[2]);
+  free(buffers[3]);
+
+  free(cl_sys);
+  free(cmdQueues);
+  free(contexts);
+  free(devices);
 
   return 0;
 }
