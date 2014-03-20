@@ -1,4 +1,4 @@
-3                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
+1                 # thermostat types 1:Hoover-Nose, 2: Vel rescaling, 3: Berendsen
 108               # natoms
 39.948            # mass in AMU
 0.2379            # epsilon in kcal/mol

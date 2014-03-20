@@ -631,15 +631,15 @@ int main(int argc, char **argv)
 
         if (sys.thermo==1){
         sys.ksi  +=  -kboltz/qmass*((3.0*sys.natoms+1)*sys.temp0-3.0*sys.natoms*sys.temp)*sys.dt;
-if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nKsi for Nose Hoover = %.3g (seconds)\n", sys.ksi );
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nKsi for Nose Hoover = %.3g (seconds)\n", sys.ksi );*/ 
 }
         else if (sys.thermo==2){
         sys.lambda=sqrt(sys.temp0/sys.temp);        
-if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Velocity Rescaling = %.3g (seconds)\n",sys.lambda);
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Velocity Rescaling = %.3g (seconds)\n",sys.lambda);*/  
 }
         else if (sys.thermo==3){
         sys.lambda=sqrt(1+sys.dt/sys.crt*(sys.temp0/sys.temp-1));
-if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Berendsen = %.3g (seconds)\n",sys.lambda);
+/*if ((sys.nfi % nprint) == 0) fprintf( stdout, "\n\nLambda for Berendsen = %.3g (seconds)\n",sys.lambda);*/  
         } /*sys.crt is the rise time of Berendsen thermostat*/
 	/* writing output files (positions, energies and temperature) */
 if ((sys.nfi % nprint) == 0) {
