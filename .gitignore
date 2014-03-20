@@ -15,10 +15,11 @@
 *.exe
 *.out
 *.app
+ljmd*
 
-
+# data files
+*.inp
+*.rest
+*.dat*
+*.xyz*
 .DS_Store
-benchmarks/.DS_Store
-examples/argon_108.dat
-examples/argon_108.xyz
-ljmd-cl.d
